@@ -286,6 +286,11 @@ dependencies {
     implementation "com.google.accompanist:accompanist-systemuicontroller:0.30.1"
     implementation "androidx.lifecycle:lifecycle-runtime-compose:2.6.2"
 
+    // Pager3 with compose
+    def pagerVersion = '3.3.0'
+    implementation "androidx.paging:paging-runtime:$pagerVersion"
+    implementation "androidx.paging:paging-compose:$pagerVersion"
+
     // Coroutines
     def coroutines = '1.7.3'
     implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:$coroutines"
