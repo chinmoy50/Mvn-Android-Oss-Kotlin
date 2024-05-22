@@ -7,6 +7,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.paging.Pager
 import androidx.paging.PagingConfig
+import androidx.paging.PagingData
 import androidx.paging.PagingSource
 import androidx.paging.PagingState
 import androidx.paging.cachedIn
@@ -29,6 +30,10 @@ import io.reactivex.Observable
 import io.reactivex.disposables.CompositeDisposable
 import io.reactivex.subjects.BehaviorSubject
 import io.reactivex.subjects.PublishSubject
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.rx2.asFlow
 import java.util.concurrent.TimeUnit
@@ -117,16 +122,6 @@ interface SearchViewModel {
         private val cookieManager = requireNotNull(environment.cookieManager())
         private val scheduler = environment.schedulerV2()
         private val analyticEvents = requireNotNull(environment.analytics())
-
-        val projectList = Pager(
-            PagingConfig(
-                pageSize = 15,
-                prefetchDistance = 3,
-                enablePlaceholders = true
-            )
-        ) {
-            SearchPagingSource(apiClient, defaultParams)
-        }.flow.cachedIn(viewModelScope)
 
         /**
          * Returns a project and its appropriate ref tag given its location in a list of popular projects or search results.
@@ -217,6 +212,40 @@ interface SearchViewModel {
             private val defaultParams = DiscoveryParams.builder().sort(defaultSort).build()
         }
 
+        private val _uiState = MutableStateFlow<PagingData<Project>>(PagingData.empty())
+        val projectListUiState: StateFlow<PagingData<Project>> = _uiState.asStateFlow()
+
+//        val projectList = Pager(
+//            PagingConfig(
+//                pageSize = 15,
+//                prefetchDistance = 3,
+//                enablePlaceholders = true
+//            )
+//        ) {
+//            SearchPagingSource(apiClient, defaultParams)
+//        }.flow.cachedIn(viewModelScope)
+
+        fun onSearchClicked(params: DiscoveryParams = defaultParams) {
+            viewModelScope.launch {
+                try {
+                    Pager(
+                        PagingConfig(
+                            pageSize = 15,
+                            prefetchDistance = 3,
+                            enablePlaceholders = true
+                        )
+                    ) {
+                        SearchPagingSource(apiClient, params)
+                    }
+                        .flow
+                        .cachedIn(viewModelScope)
+                        .collectLatest { pagingData ->
+                            _uiState.value = pagingData
+                        }
+                } catch (e: Exception) {
+                }
+            }
+        }
         init {
             viewModelScope.launch {
 
@@ -231,6 +260,11 @@ interface SearchViewModel {
                     .filter { it.isTrimmedEmpty() }
                     .map { defaultParams }
                     .startWith(defaultParams)
+
+                Observable.merge(searchParams, popularParams) // Convert to UIState and coroutines
+                    .subscribe {
+                        onSearchClicked(it)
+                    }.addToDisposable(disposables)
 
 //                val paginator = ApiPaginatorV2.builder<Project, DiscoverEnvelope, DiscoveryParams>()
 //                    .nextPage(nextPage)

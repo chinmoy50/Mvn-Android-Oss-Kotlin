@@ -9,6 +9,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.rememberScaffoldState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -46,6 +47,7 @@ class SearchActivity : ComponentActivity() {
     private lateinit var disposables: CompositeDisposable
     private var theme = AppThemes.MATCH_SYSTEM.ordinal
 
+    @OptIn(ExperimentalMaterialApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -67,10 +69,10 @@ class SearchActivity : ComponentActivity() {
 //            var popularProjects =
 //                viewModel.popularProjects().subscribeAsState(initial = listOf()).value
 
-            var searchedProjects =
-                viewModel.projectList.collectAsLazyPagingItems()
+            val searchedProjects =
+                viewModel.projectListUiState.collectAsLazyPagingItems()
 
-            var isLoading = !viewModel.projectList.collectAsLazyPagingItems().loadState.isIdle
+            val isLoading = !viewModel.projectListUiState.collectAsLazyPagingItems().loadState.isIdle
 
             var isTyping by remember { mutableStateOf(false) }
 
@@ -115,7 +117,8 @@ class SearchActivity : ComponentActivity() {
                     },
                     onItemClicked = { project ->
                         viewModel.projectClicked(project = project)
-                    }
+                    },
+                    pullRefreshCallback = { viewModel.onSearchClicked() }
                 )
             }
 

@@ -13,11 +13,16 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.Scaffold
 import androidx.compose.material.ScaffoldState
 import androidx.compose.material.Surface
 import androidx.compose.material.Text
+import androidx.compose.material.pullrefresh.PullRefreshIndicator
+import androidx.compose.material.pullrefresh.pullRefresh
+import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import androidx.compose.material.rememberScaffoldState
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -60,6 +65,7 @@ val projectsList = List(100) {
         .state(if (it in 10..20) Project.STATE_SUBMITTED else Project.STATE_LIVE)
         .build()
 }
+@OptIn(ExperimentalMaterialApi::class)
 @Composable
 @Preview(name = "Light", uiMode = Configuration.UI_MODE_NIGHT_NO)
 @Preview(name = "Dark", uiMode = Configuration.UI_MODE_NIGHT_YES)
@@ -79,6 +85,7 @@ fun SearchScreenPreviewNonEmpty() {
     }
 }
 
+@OptIn(ExperimentalMaterialApi::class)
 @Composable
 @Preview(name = "Light", uiMode = Configuration.UI_MODE_NIGHT_NO)
 @Preview(name = "Dark", uiMode = Configuration.UI_MODE_NIGHT_YES)
@@ -109,6 +116,8 @@ enum class SearchScreenTestTag {
     NORMAL_PROJECT_VIEW
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@ExperimentalMaterialApi
 @Composable
 fun SearchScreen(
     environment: Environment? = null,
@@ -120,10 +129,12 @@ fun SearchScreen(
     lazyColumnListState: LazyListState,
     showEmptyView: Boolean,
     onSearchTermChanged: (String) -> Unit,
-    onItemClicked: (Project) -> Unit
+    onItemClicked: (Project) -> Unit,
+    pullRefreshCallback: () -> Unit = {}
 ) {
     val context = LocalContext.current
     var currentSearchTerm by rememberSaveable { mutableStateOf("") }
+    val state = rememberPullRefreshState(isLoading, pullRefreshCallback)
 
     Scaffold(
         scaffoldState = scaffoldState,
@@ -141,126 +152,137 @@ fun SearchScreen(
         backgroundColor = colors.kds_white
     ) { padding ->
 
-        if (showEmptyView) {
-            SearchEmptyView(
-                modifier = Modifier.testTag(SearchScreenTestTag.EMPTY_VIEW.name),
-                environment = environment,
-                currentSearchTerm = currentSearchTerm
-            )
-        } else {
-            LazyColumn(
-                modifier = Modifier
-                    .testTag(SearchScreenTestTag.LIST_VIEW.name)
-                    .padding(padding)
-                    .fillMaxWidth(),
-                contentPadding = PaddingValues(
-                    start = dimensions.paddingSmall,
-                    end = dimensions.paddingSmall
-                ),
-                state = lazyColumnListState,
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                // Here we use the standard items API
-                items(
-                    count = projects.itemCount,
-                ) { index ->
-                    // As the standard items call provides only the index, we get the item
-                    // directly from our lazyPagingItems
-                    val project = projects[index] ?: Project.builder().build()
-                    if (index == 0 && isPopularList) {
-                        Spacer(modifier = Modifier.height(dimensions.paddingMedium))
-
-                        Text(
-                            modifier = Modifier
-                                .testTag(SearchScreenTestTag.POPULAR_PROJECTS_TITLE.name)
-                                .fillMaxWidth(),
-                            text = stringResource(id = R.string.Popular_Projects),
-                            style = typography.title2,
-                            color = colors.kds_support_700,
-                            textAlign = TextAlign.Start
-                        )
-                    }
-
-                    if (index == 0) {
-                        Spacer(modifier = Modifier.height(dimensions.paddingMedium))
-
-                        FeaturedSearchViewHolder(
-                            modifier = Modifier
-                                .testTag(SearchScreenTestTag.FEATURED_PROJECT_VIEW.name),
-                            imageUrl = project.photo()?.full(),
-                            title = project.name(),
-                            isLaunched = project.isLive,
-                            fundedAmount = project.percentageFunded().toInt(),
-                            timeRemainingString = environment?.ksString()?.let {
-                                NumberUtils.format(
-                                    project.deadlineCountdownValue(),
-                                ) + " " + project.deadlineCountdownDetail(context, it)
-                            } ?: ""
-                        ) {
-                            onItemClicked(project)
-                        }
-
-                        if (projects.itemCount > 1) {
+        Box(
+            modifier = Modifier
+                .pullRefresh(state)
+        ) {
+            if (showEmptyView) {
+                SearchEmptyView(
+                    modifier = Modifier.testTag(SearchScreenTestTag.EMPTY_VIEW.name),
+                    environment = environment,
+                    currentSearchTerm = currentSearchTerm
+                )
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .testTag(SearchScreenTestTag.LIST_VIEW.name)
+                        .padding(padding)
+                        .fillMaxWidth(),
+                    contentPadding = PaddingValues(
+                        start = dimensions.paddingSmall,
+                        end = dimensions.paddingSmall
+                    ),
+                    state = lazyColumnListState,
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    // Here we use the standard items API
+                    items(
+                        count = projects.itemCount,
+                    ) { index ->
+                        // As the standard items call provides only the index, we get the item
+                        // directly from our lazyPagingItems
+                        val project = projects[index] ?: Project.builder().build()
+                        if (index == 0 && isPopularList) {
                             Spacer(modifier = Modifier.height(dimensions.paddingMedium))
 
-                            KSDividerLineGrey()
-
-                            Spacer(modifier = Modifier.height(dimensions.paddingXSmall))
-                        }
-                    } else {
-                        ProjectSearchViewHolder(
-                            modifier = Modifier
-                                .testTag(SearchScreenTestTag.NORMAL_PROJECT_VIEW.name + index),
-                            imageUrl = project.photo()?.med(),
-                            title = project.name(),
-                            isLaunched = project.isLive,
-                            fundedAmount = project.percentageFunded().toInt(),
-                            timeRemainingString = environment?.ksString()?.let {
-                                NumberUtils.format(
-                                    project.deadlineCountdownValue(),
-                                ) + " " + project.deadlineCountdownDetail(context, it)
-                            } ?: ""
-                        ) {
-                            onItemClicked(project)
+                            Text(
+                                modifier = Modifier
+                                    .testTag(SearchScreenTestTag.POPULAR_PROJECTS_TITLE.name)
+                                    .fillMaxWidth(),
+                                text = stringResource(id = R.string.Popular_Projects),
+                                style = typography.title2,
+                                color = colors.kds_support_700,
+                                textAlign = TextAlign.Start
+                            )
                         }
 
-                        if (index < projects.itemCount - 1) {
-                            Spacer(modifier = Modifier.height(dimensions.paddingXSmall))
+                        if (index == 0) {
+                            Spacer(modifier = Modifier.height(dimensions.paddingMedium))
 
-                            KSDividerLineGrey()
+                            FeaturedSearchViewHolder(
+                                modifier = Modifier
+                                    .testTag(SearchScreenTestTag.FEATURED_PROJECT_VIEW.name),
+                                imageUrl = project.photo()?.full(),
+                                title = project.name(),
+                                isLaunched = project.isLive,
+                                fundedAmount = project.percentageFunded().toInt(),
+                                timeRemainingString = environment?.ksString()?.let {
+                                    NumberUtils.format(
+                                        project.deadlineCountdownValue(),
+                                    ) + " " + project.deadlineCountdownDetail(context, it)
+                                } ?: ""
+                            ) {
+                                onItemClicked(project)
+                            }
 
-                            Spacer(modifier = Modifier.height(dimensions.paddingXSmall))
+                            if (projects.itemCount > 1) {
+                                Spacer(modifier = Modifier.height(dimensions.paddingMedium))
+
+                                KSDividerLineGrey()
+
+                                Spacer(modifier = Modifier.height(dimensions.paddingXSmall))
+                            }
                         } else {
-                            Spacer(modifier = Modifier.height(dimensions.paddingMediumLarge))
+                            ProjectSearchViewHolder(
+                                modifier = Modifier
+                                    .testTag(SearchScreenTestTag.NORMAL_PROJECT_VIEW.name + index),
+                                imageUrl = project.photo()?.med(),
+                                title = project.name(),
+                                isLaunched = project.isLive,
+                                fundedAmount = project.percentageFunded().toInt(),
+                                timeRemainingString = environment?.ksString()?.let {
+                                    NumberUtils.format(
+                                        project.deadlineCountdownValue(),
+                                    ) + " " + project.deadlineCountdownDetail(context, it)
+                                } ?: ""
+                            ) {
+                                onItemClicked(project)
+                            }
+
+                            if (index < projects.itemCount - 1) {
+                                Spacer(modifier = Modifier.height(dimensions.paddingXSmall))
+
+                                KSDividerLineGrey()
+
+                                Spacer(modifier = Modifier.height(dimensions.paddingXSmall))
+                            } else {
+                                Spacer(modifier = Modifier.height(dimensions.paddingMediumLarge))
+                            }
+                        }
+                    }
+
+                    item(isLoading) {
+                        if (isLoading && projects.itemCount > 0) {
+                            Spacer(modifier = Modifier.height(dimensions.paddingMedium))
+
+                            KSCircularProgressIndicator(
+                                modifier = Modifier
+                                    .testTag(SearchScreenTestTag.IN_LIST_LOADING_VIEW.name)
+                                    .size(size = dimensions.imageSizeLarge)
+                            )
+
+                            Spacer(modifier = Modifier.height(dimensions.paddingMedium))
                         }
                     }
                 }
 
-                item(isLoading) {
-                    if (isLoading && projects.itemCount > 0) {
-                        Spacer(modifier = Modifier.height(dimensions.paddingMedium))
-
-                        KSCircularProgressIndicator(
-                            modifier = Modifier
-                                .testTag(SearchScreenTestTag.IN_LIST_LOADING_VIEW.name)
-                                .size(size = dimensions.imageSizeLarge)
-                        )
-
-                        Spacer(modifier = Modifier.height(dimensions.paddingMedium))
-                    }
-                }
+                PullRefreshIndicator(
+                    isLoading,
+                    state,
+                    modifier = Modifier.align(Alignment.TopCenter)
+                )
             }
-        }
 
-        if (isLoading && projects.itemCount == 0) {
-            Box(
-                modifier = Modifier
-                    .testTag(SearchScreenTestTag.LOADING_VIEW.name)
-                    .fillMaxSize()
-                    .background(color = colors.kds_black.copy(alpha = 0.1f)),
-                contentAlignment = Alignment.Center
-            ) {
-                KSCircularProgressIndicator()
+            if (isLoading && projects.itemCount == 0) {
+                Box(
+                    modifier = Modifier
+                        .testTag(SearchScreenTestTag.LOADING_VIEW.name)
+                        .fillMaxSize()
+                        .background(color = colors.kds_black.copy(alpha = 0.1f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    KSCircularProgressIndicator()
+                }
             }
         }
     }
