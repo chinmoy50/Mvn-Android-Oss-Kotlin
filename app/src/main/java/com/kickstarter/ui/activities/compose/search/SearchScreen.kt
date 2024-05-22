@@ -54,6 +54,14 @@ import com.kickstarter.ui.views.compose.search.SearchEmptyView
 import com.kickstarter.ui.views.compose.search.SearchTopBar
 import kotlinx.coroutines.flow.flowOf
 
+val projectsList = List(100) {
+    Project.builder()
+        .name("This is a test $it")
+        .pledged((it * 2).toDouble())
+        .goal(100.0)
+        .state(if (it in 10..20) Project.STATE_SUBMITTED else Project.STATE_LIVE)
+        .build()
+}
 @Composable
 @Preview(name = "Light", uiMode = Configuration.UI_MODE_NIGHT_NO)
 @Preview(name = "Dark", uiMode = Configuration.UI_MODE_NIGHT_YES)
@@ -64,14 +72,7 @@ fun SearchScreenPreviewNonEmpty() {
             scaffoldState = rememberScaffoldState(),
             isLoading = false,
             isPopularList = true,
-            projects = flowOf(PagingData.from(List(100) {
-                Project.builder()
-                    .name("This is a test $it")
-                    .pledged((it * 2).toDouble())
-                    .goal(100.0)
-                    .state(if (it in 10..20) Project.STATE_SUBMITTED else Project.STATE_LIVE)
-                    .build()
-            })).collectAsLazyPagingItems(),
+            projects = flowOf(PagingData.from(projectsList)).collectAsLazyPagingItems(),
             lazyColumnListState = rememberLazyListState(),
             showEmptyView = false,
             onSearchTermChanged = {},
@@ -167,7 +168,6 @@ fun SearchScreen(
                     // Here we use the new itemKey extension on LazyPagingItems to
                     // handle placeholders automatically, ensuring you only need to provide
                     // keys for real items
-                    key = projects.itemKey { it.id() },
                     // Similarly, itemContentType lets you set a custom content type for each item
                     contentType = projects.itemContentType { "contentType" }
                 ) { index ->

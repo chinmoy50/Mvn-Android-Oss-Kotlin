@@ -7,11 +7,9 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.paging.Pager
 import androidx.paging.PagingConfig
-import androidx.paging.PagingData
 import androidx.paging.PagingSource
 import androidx.paging.PagingState
 import androidx.paging.cachedIn
-import androidx.paging.map
 import com.apollographql.apollo.api.CustomTypeValue
 import com.kickstarter.libs.Environment
 import com.kickstarter.libs.RefTag
@@ -31,15 +29,6 @@ import io.reactivex.Observable
 import io.reactivex.disposables.CompositeDisposable
 import io.reactivex.subjects.BehaviorSubject
 import io.reactivex.subjects.PublishSubject
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.catch
-import kotlinx.coroutines.flow.collect
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.rx2.asFlow
 import java.util.concurrent.TimeUnit
@@ -47,24 +36,41 @@ import java.util.concurrent.TimeUnit
 class SearchPagingSource(
     private val apiClient: ApiClientTypeV2,
     private val queryParams: DiscoveryParams
-): PagingSource<DiscoveryParams, Project>() {
-    override fun getRefreshKey(state: PagingState<DiscoveryParams, Project>): DiscoveryParams? {
-        return null
+): PagingSource<Pair<DiscoveryParams?, String?>, Project>() {
+    override fun getRefreshKey(state: PagingState<Pair<DiscoveryParams?, String?>, Project>): Pair<DiscoveryParams?, String?> {
+        return Pair(queryParams, null)
     }
 
-    override suspend fun load(params: LoadParams<DiscoveryParams>): LoadResult<DiscoveryParams, Project> {
+    override suspend fun load(params: LoadParams<Pair<DiscoveryParams?, String?>>): LoadResult<Pair<DiscoveryParams?, String?>, Project> {
         return try {
             var projectsList = emptyList<Project>()
-            var moreProjectsUrl: String? = null
-            apiClient.fetchProjects(queryParams).asFlow().collect {
-                projectsList = it.projects()
-                moreProjectsUrl = it.urls()?.api()?.moreProjects()
+
+            val discoveryParams = params.key?.first
+
+            val currentPageUrl = params.key?.second
+            var nextPageUrl: String? = null
+
+
+            if (currentPageUrl.isNotNull()) {
+                // - Following pages will call the endpoint, with a paging URL.
+                // In an ideal implementation calling the network layer should be suspend functions, not converted to a flow Stream
+                apiClient.fetchProjects(requireNotNull(currentPageUrl)).asFlow().collect {
+                    projectsList = it.projects()
+                    nextPageUrl = it.urls()?.api()?.moreProjects()
+                }
+            } else {
+                // - First page requires discovery query params either the search one or the default ones
+                // In an ideal implementation calling the network layer should be suspend functions, not converted to a flow Stream
+                apiClient.fetchProjects(queryParams).asFlow().collect {
+                    projectsList = it.projects()
+                    nextPageUrl = it.urls()?.api()?.moreProjects()
+                }
             }
 
             return LoadResult.Page(
                 data = projectsList,
                 prevKey = null, // only forward pagination
-                nextKey = null
+                nextKey = Pair(discoveryParams, nextPageUrl)
             )
         }catch (e: Exception) {
             LoadResult.Error(e)
