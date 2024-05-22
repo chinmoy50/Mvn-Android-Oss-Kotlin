@@ -18,6 +18,8 @@ import com.bumptech.glide.request.target.Target
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.kickstarter.R
 import com.kickstarter.libs.utils.extensions.isKSApplication
+import timber.log.Timber
+
 
 fun ImageView.loadCircleImage(url: String?) {
     url?.let {
@@ -84,7 +86,9 @@ fun ImageView.loadImageWithResize(
 }
 fun ImageView.loadImage(url: String?, context: Context, imageZoomablePlaceholder: AppCompatImageView? = null) {
     url?.let {
-        val targetView = this
+        var width: Int = 0
+        var height: Int = 0
+        Timber.d("*************************  $url")
         if (context.applicationContext.isKSApplication()) {
             try {
                 Glide.with(context)
@@ -97,7 +101,9 @@ fun ImageView.loadImage(url: String?, context: Context, imageZoomablePlaceholder
                             dataSource: com.bumptech.glide.load.DataSource,
                             isFirstResource: Boolean
                         ): Boolean {
-                            targetView.setImageDrawable(resource)
+                            width = resource.intrinsicWidth
+                            height = resource.intrinsicHeight
+                            Timber.d("*************************    ${resource.intrinsicWidth} , ${resource.intrinsicHeight}")
                             imageZoomablePlaceholder?.setImageDrawable(resource)
                             return isFirstResource
                         }
@@ -108,12 +114,12 @@ fun ImageView.loadImage(url: String?, context: Context, imageZoomablePlaceholder
                             target: Target<Drawable>,
                             isFirstResource: Boolean
                         ): Boolean {
-                            targetView.setImageDrawable(null)
                             imageZoomablePlaceholder?.setImageDrawable(null)
                             return isFirstResource
                         }
                     })
                     .diskCacheStrategy(DiskCacheStrategy.AUTOMATIC)
+                    .override(width, height)
                     .load(url)
                     .into(this)
             } catch (e: Exception) {
