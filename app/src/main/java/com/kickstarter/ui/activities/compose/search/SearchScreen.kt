@@ -34,8 +34,6 @@ import androidx.compose.ui.unit.dp
 import androidx.paging.PagingData
 import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
-import androidx.paging.compose.itemContentType
-import androidx.paging.compose.itemKey
 import com.kickstarter.R
 import com.kickstarter.libs.Environment
 import com.kickstarter.libs.utils.NumberUtils
@@ -165,11 +163,6 @@ fun SearchScreen(
                 // Here we use the standard items API
                 items(
                     count = projects.itemCount,
-                    // Here we use the new itemKey extension on LazyPagingItems to
-                    // handle placeholders automatically, ensuring you only need to provide
-                    // keys for real items
-                    // Similarly, itemContentType lets you set a custom content type for each item
-                    contentType = projects.itemContentType { "contentType" }
                 ) { index ->
                     // As the standard items call provides only the index, we get the item
                     // directly from our lazyPagingItems

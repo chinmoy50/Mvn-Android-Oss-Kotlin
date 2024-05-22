@@ -36,7 +36,7 @@ import java.util.concurrent.TimeUnit
 class SearchPagingSource(
     private val apiClient: ApiClientTypeV2,
     private val queryParams: DiscoveryParams
-): PagingSource<Pair<DiscoveryParams?, String?>, Project>() {
+) : PagingSource<Pair<DiscoveryParams?, String?>, Project>() {
     override fun getRefreshKey(state: PagingState<Pair<DiscoveryParams?, String?>, Project>): Pair<DiscoveryParams?, String?> {
         return Pair(queryParams, null)
     }
@@ -49,7 +49,6 @@ class SearchPagingSource(
 
             val currentPageUrl = params.key?.second
             var nextPageUrl: String? = null
-
 
             if (currentPageUrl.isNotNull()) {
                 // - Following pages will call the endpoint, with a paging URL.
@@ -72,11 +71,10 @@ class SearchPagingSource(
                 prevKey = null, // only forward pagination
                 nextKey = Pair(discoveryParams, nextPageUrl)
             )
-        }catch (e: Exception) {
+        } catch (e: Exception) {
             LoadResult.Error(e)
         }
     }
-
 }
 
 interface SearchViewModel {
@@ -120,7 +118,13 @@ interface SearchViewModel {
         private val scheduler = environment.schedulerV2()
         private val analyticEvents = requireNotNull(environment.analytics())
 
-        val projectList = Pager(PagingConfig(pageSize = 100)) {
+        val projectList = Pager(
+            PagingConfig(
+                pageSize = 15,
+                prefetchDistance = 3,
+                enablePlaceholders = true
+            )
+        ) {
             SearchPagingSource(apiClient, defaultParams)
         }.flow.cachedIn(viewModelScope)
 
@@ -216,7 +220,6 @@ interface SearchViewModel {
         init {
             viewModelScope.launch {
 
-
                 val searchParams = search
                     .filter { it.isNotNull() }
                     .filter { it.isPresent() }
@@ -274,7 +277,7 @@ interface SearchViewModel {
 //                    }
 //                    .addToDisposable(disposables)
 
-                //val pageCount = paginator.loadingPage()
+                // val pageCount = paginator.loadingPage()
                 val projects = Observable.merge(popularProjects, searchProjects)
 
 //                params.compose(Transformers.takePairWhenV2(projectClicked))
@@ -323,8 +326,8 @@ interface SearchViewModel {
                 selectedProject.subscribe {
                     if (it.first.launchedAt() == DateTimeAdapter().decode(
                             CustomTypeValue.fromRawValue(
-                                0
-                            )
+                                    0
+                                )
                         ) &&
                         ffClient.getBoolean(FlagKey.ANDROID_PRE_LAUNCH_SCREEN)
                     ) {

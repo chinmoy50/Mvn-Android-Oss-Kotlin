@@ -278,7 +278,7 @@ dependencies {
     // Compose
     implementation "androidx.compose.ui:ui:$compose_version"
     implementation "androidx.compose.ui:ui-tooling:1.4.3"
-    implementation "androidx.compose.material:material:1.6.2"
+    implementation "androidx.compose.material:material:1.6.7"
     debugImplementation "androidx.compose.ui:ui-tooling:1.4.3"
     implementation "androidx.compose.runtime:runtime-rxjava2:$compose_version"
     implementation 'androidx.activity:activity-compose:1.7.2'
@@ -286,7 +286,7 @@ dependencies {
     implementation "com.google.accompanist:accompanist-systemuicontroller:0.30.1"
     implementation "androidx.lifecycle:lifecycle-runtime-compose:2.6.2"
 
-    implementation 'androidx.paging:paging-common-android:3.3.0'
+    // Paging 3 for compose dependency
     implementation "androidx.paging:paging-compose:3.3.0"
 
     // Coroutines
