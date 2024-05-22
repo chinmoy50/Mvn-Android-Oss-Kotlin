@@ -37,6 +37,7 @@ import com.kickstarter.viewmodels.SearchViewModel
 import io.reactivex.android.schedulers.AndroidSchedulers
 import io.reactivex.disposables.CompositeDisposable
 import kotlinx.coroutines.delay
+import androidx.paging.compose.collectAsLazyPagingItems
 
 class SearchActivity : ComponentActivity() {
     private lateinit var viewModelFactory: SearchViewModel.Factory
@@ -64,13 +65,13 @@ class SearchActivity : ComponentActivity() {
         setContent {
             var currentSearchTerm by rememberSaveable { mutableStateOf("") }
 
-            var popularProjects =
-                viewModel.popularProjects().subscribeAsState(initial = listOf()).value
+//            var popularProjects =
+//                viewModel.popularProjects().subscribeAsState(initial = listOf()).value
 
             var searchedProjects =
-                viewModel.searchProjects().subscribeAsState(initial = listOf()).value
+                viewModel.projectList.collectAsLazyPagingItems()
 
-            var isLoading = viewModel.isFetchingProjects().subscribeAsState(initial = false).value
+            var isLoading = !viewModel.projectList.collectAsLazyPagingItems().loadState.isIdle
 
             var isTyping by remember { mutableStateOf(false) }
 
@@ -95,6 +96,7 @@ class SearchActivity : ComponentActivity() {
                     isSystemInDarkTheme() // Force dark mode uses system theme
                 } else false
             ) {
+
                 SearchScreen(
                     // GET RID OF ENVIRONMENT WHEN WE CAN
                     environment = env,
@@ -102,16 +104,12 @@ class SearchActivity : ComponentActivity() {
                     scaffoldState = rememberScaffoldState(),
                     isLoading = isLoading,
                     isPopularList = currentSearchTerm.isTrimmedEmpty(),
-                    itemsList = if (currentSearchTerm.isTrimmedEmpty()) {
-                        popularProjects
-                    } else {
-                        searchedProjects
-                    },
+                    projects = searchedProjects,
                     lazyColumnListState = lazyListState,
                     showEmptyView = !isLoading &&
                         !isTyping &&
                         !currentSearchTerm.isTrimmedEmpty() &&
-                        searchedProjects.isEmpty(),
+                        searchedProjects.itemCount == 0,
                     onSearchTermChanged = { searchTerm ->
                         if (searchTerm.isEmpty()) viewModel.clearSearchedProjects()
                         currentSearchTerm = searchTerm

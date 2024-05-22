@@ -1,34 +1,77 @@
 package com.kickstarter.viewmodels
 
 import android.content.Intent
-import android.content.SharedPreferences
 import android.util.Pair
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewModelScope
+import androidx.paging.Pager
+import androidx.paging.PagingConfig
+import androidx.paging.PagingData
+import androidx.paging.PagingSource
+import androidx.paging.PagingState
+import androidx.paging.cachedIn
+import androidx.paging.map
 import com.apollographql.apollo.api.CustomTypeValue
-import com.kickstarter.libs.ApiPaginatorV2
 import com.kickstarter.libs.Environment
 import com.kickstarter.libs.RefTag
 import com.kickstarter.libs.featureflag.FlagKey
 import com.kickstarter.libs.graphql.DateTimeAdapter
 import com.kickstarter.libs.rx.transformers.Transformers
 import com.kickstarter.libs.utils.ListUtils
-import com.kickstarter.libs.utils.RefTagUtils
 import com.kickstarter.libs.utils.extensions.addToDisposable
-import com.kickstarter.libs.utils.extensions.intValueOrZero
 import com.kickstarter.libs.utils.extensions.isNotNull
 import com.kickstarter.libs.utils.extensions.isPresent
 import com.kickstarter.libs.utils.extensions.isTrimmedEmpty
 import com.kickstarter.models.Project
+import com.kickstarter.services.ApiClientTypeV2
 import com.kickstarter.services.DiscoveryParams
 import com.kickstarter.services.apiresponses.DiscoverEnvelope
-import com.kickstarter.ui.data.ProjectData.Companion.builder
 import io.reactivex.Observable
 import io.reactivex.disposables.CompositeDisposable
 import io.reactivex.subjects.BehaviorSubject
 import io.reactivex.subjects.PublishSubject
-import java.net.CookieManager
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.rx2.asFlow
 import java.util.concurrent.TimeUnit
+
+class SearchPagingSource(
+    private val apiClient: ApiClientTypeV2,
+    private val queryParams: DiscoveryParams
+): PagingSource<DiscoveryParams, Project>() {
+    override fun getRefreshKey(state: PagingState<DiscoveryParams, Project>): DiscoveryParams? {
+        return null
+    }
+
+    override suspend fun load(params: LoadParams<DiscoveryParams>): LoadResult<DiscoveryParams, Project> {
+        return try {
+            var projectsList = emptyList<Project>()
+            var moreProjectsUrl: String? = null
+            apiClient.fetchProjects(queryParams).asFlow().collect {
+                projectsList = it.projects()
+                moreProjectsUrl = it.urls()?.api()?.moreProjects()
+            }
+
+            return LoadResult.Page(
+                data = projectsList,
+                prevKey = null, // only forward pagination
+                nextKey = null
+            )
+        }catch (e: Exception) {
+            LoadResult.Error(e)
+        }
+    }
+
+}
 
 interface SearchViewModel {
     interface Inputs {
@@ -63,9 +106,17 @@ interface SearchViewModel {
         private val environment: Environment,
         private val intent: Intent? = null
     ) : ViewModel(), Inputs, Outputs {
+
+        private val apiClient = requireNotNull(environment.apiClientV2())
         private val discoverEnvelope = PublishSubject.create<DiscoverEnvelope>()
-        private val sharedPreferences: SharedPreferences
-        private val cookieManager: CookieManager
+        private val sharedPreferences = requireNotNull(environment.sharedPreferences())
+        private val cookieManager = requireNotNull(environment.cookieManager())
+        private val scheduler = environment.schedulerV2()
+        private val analyticEvents = requireNotNull(environment.analytics())
+
+        val projectList = Pager(PagingConfig(pageSize = 100)) {
+            SearchPagingSource(apiClient, defaultParams)
+        }.flow.cachedIn(viewModelScope)
 
         /**
          * Returns a project and its appropriate ref tag given its location in a list of popular projects or search results.
@@ -157,149 +208,150 @@ interface SearchViewModel {
         }
 
         init {
-            val apiClient = requireNotNull(environment.apiClientV2())
-            val scheduler = environment.schedulerV2()
-            val analyticEvents = requireNotNull(environment.analytics())
-            sharedPreferences = requireNotNull(environment.sharedPreferences())
-            cookieManager = requireNotNull(environment.cookieManager())
+            viewModelScope.launch {
 
-            val searchParams = search
-                .filter { it.isNotNull() }
-                .filter { it.isPresent() }
-                .debounce(300, TimeUnit.MILLISECONDS, scheduler)
-                .map { DiscoveryParams.builder().term(it).build() }
 
-            val popularParams = search
-                .filter { it.isNotNull() }
-                .filter { it.isTrimmedEmpty() }
-                .map { defaultParams }
-                .startWith(defaultParams)
+                val searchParams = search
+                    .filter { it.isNotNull() }
+                    .filter { it.isPresent() }
+                    .debounce(300, TimeUnit.MILLISECONDS, scheduler)
+                    .map { DiscoveryParams.builder().term(it).build() }
 
-            val params = Observable.merge(searchParams, popularParams)
+                val popularParams = search
+                    .filter { it.isNotNull() }
+                    .filter { it.isTrimmedEmpty() }
+                    .map { defaultParams }
+                    .startWith(defaultParams)
 
-            val paginator = ApiPaginatorV2.builder<Project, DiscoverEnvelope, DiscoveryParams>()
-                .nextPage(nextPage)
-                .startOverWith(params)
-                .envelopeToListOfData { envelope: DiscoverEnvelope ->
-                    discoverEnvelope.onNext(envelope)
-                    envelope.projects()
-                }
-                .envelopeToMoreUrl { env: DiscoverEnvelope ->
-                    env.urls()?.api()?.moreProjects()
-                }
-                .clearWhenStartingOver(true)
-                .concater { xs: List<Project>, ys: List<Project> ->
-                    ListUtils.concatDistinct(
-                        xs,
-                        ys
-                    )
-                }
-                .loadWithParams {
-                    apiClient.fetchProjects(it)
-                }
-                .loadWithPaginationPath {
-                    apiClient.fetchProjects(it)
-                }
-                .build()
+//                val paginator = ApiPaginatorV2.builder<Project, DiscoverEnvelope, DiscoveryParams>()
+//                    .nextPage(nextPage)
+//                    .startOverWith(params)
+//                    .envelopeToListOfData { envelope: DiscoverEnvelope ->
+//                        discoverEnvelope.onNext(envelope)
+//                        envelope.projects()
+//                    }
+//                    .envelopeToMoreUrl { env: DiscoverEnvelope ->
+//                        env.urls()?.api()?.moreProjects()
+//                    }
+//                    .clearWhenStartingOver(true)
+//                    .concater { xs: List<Project>, ys: List<Project> ->
+//                        ListUtils.concatDistinct(
+//                            xs,
+//                            ys
+//                        )
+//                    }
+//                    .loadWithParams {
+//                        apiClient.fetchProjects(it)
+//                    }
+//                    .loadWithPaginationPath {
+//                        apiClient.fetchProjects(it)
+//                    }
+//                    .build()
 
-            paginator.isFetching
-                .subscribe(isFetchingProjects)
+//                paginator.isFetching
+//                    .subscribe(isFetchingProjects)
 
-            search
-                .filter { it.isNotNull() }
-                .filter { it.isTrimmedEmpty() }
-                .subscribe { searchProjects.onNext(ListUtils.empty()) }
-                .addToDisposable(disposables)
+                search
+                    .filter { it.isNotNull() }
+                    .filter { it.isTrimmedEmpty() }
+                    .subscribe { searchProjects.onNext(ListUtils.empty()) }
+                    .addToDisposable(disposables)
+//
+//                params
+//                    .compose(Transformers.takePairWhenV2(paginator.paginatedData()))
+//                    .subscribe { paramsAndProjects: Pair<DiscoveryParams, List<Project>> ->
+//                        if (paramsAndProjects.first.sort() == defaultSort) {
+//                            popularProjects.onNext(paramsAndProjects.second)
+//                        } else {
+//                            searchProjects.onNext(paramsAndProjects.second)
+//                        }
+//                    }
+//                    .addToDisposable(disposables)
 
-            params
-                .compose(Transformers.takePairWhenV2(paginator.paginatedData()))
-                .subscribe { paramsAndProjects: Pair<DiscoveryParams, List<Project>> ->
-                    if (paramsAndProjects.first.sort() == defaultSort) {
-                        popularProjects.onNext(paramsAndProjects.second)
+                //val pageCount = paginator.loadingPage()
+                val projects = Observable.merge(popularProjects, searchProjects)
+
+//                params.compose(Transformers.takePairWhenV2(projectClicked))
+//                    .compose(Transformers.combineLatestPair(pageCount))
+//                    .subscribe { projectDiscoveryParamsPair: Pair<Pair<DiscoveryParams, Project>, Int> ->
+//                        val refTag = RefTagUtils.projectAndRefTagFromParamsAndProject(
+//                            projectDiscoveryParamsPair.first.first,
+//                            projectDiscoveryParamsPair.first.second
+//                        )
+//                        val cookieRefTag = RefTagUtils.storedCookieRefTagForProject(
+//                            projectDiscoveryParamsPair.first.second,
+//                            cookieManager,
+//                            sharedPreferences
+//                        )
+//                        val projectData = builder()
+//                            .refTagFromIntent(refTag.second)
+//                            .refTagFromCookie(cookieRefTag)
+//                            .project(projectDiscoveryParamsPair.first.second)
+//                            .build()
+//
+//                        analyticEvents.trackDiscoverSearchResultProjectCATClicked(
+//                            projectDiscoveryParamsPair.first.first,
+//                            projectData,
+//                            projectDiscoveryParamsPair.second,
+//                            defaultSort
+//                        )
+//                    }
+//                    .addToDisposable(disposables)
+
+                val selectedProject =
+                    Observable.combineLatest<String, List<Project>, Pair<String, List<Project>>>(
+                        search,
+                        projects
+                    ) { a: String, b: List<Project> ->
+                        Pair.create(a, b)
+                    }
+                        .compose(Transformers.takePairWhenV2(projectClicked))
+                        .map { searchTermAndProjectsAndProjectClicked: Pair<Pair<String, List<Project>>, Project> ->
+                            val searchTerm = searchTermAndProjectsAndProjectClicked.first.first
+                            val currentProjects =
+                                searchTermAndProjectsAndProjectClicked.first.second
+                            val projectClicked = searchTermAndProjectsAndProjectClicked.second
+                            projectAndRefTag(searchTerm, currentProjects, projectClicked)
+                        }
+
+                selectedProject.subscribe {
+                    if (it.first.launchedAt() == DateTimeAdapter().decode(
+                            CustomTypeValue.fromRawValue(
+                                0
+                            )
+                        ) &&
+                        ffClient.getBoolean(FlagKey.ANDROID_PRE_LAUNCH_SCREEN)
+                    ) {
+                        startPreLaunchProjectActivity.onNext(it)
                     } else {
-                        searchProjects.onNext(paramsAndProjects.second)
+                        startProjectActivity.onNext(it)
                     }
                 }
-                .addToDisposable(disposables)
+                    .addToDisposable(disposables)
 
-            val pageCount = paginator.loadingPage()
-            val projects = Observable.merge(popularProjects, searchProjects)
+//                params
+//                    .compose(Transformers.takePairWhenV2(discoverEnvelope))
+//                    .compose(Transformers.combineLatestPair(pageCount))
+//                    .filter { it: Pair<Pair<DiscoveryParams, DiscoverEnvelope>, Int> ->
+//                        (
+//                                it.first.first.term().isNotNull() &&
+//                                        it.first.first.term()?.isPresent() ?: false &&
+//                                        it.first.first.sort() != defaultSort &&
+//                                        it.second.intValueOrZero() == 1
+//                                )
+//                    }
+//                    .distinct()
+//                    .subscribe { it: Pair<Pair<DiscoveryParams, DiscoverEnvelope>, Int> ->
+//                        analyticEvents.trackSearchResultPageViewed(
+//                            it.first.first,
+//                            it.first.second.stats()?.count() ?: 0,
+//                            defaultSort
+//                        )
+//                    }
+//                    .addToDisposable(disposables)
 
-            params.compose(Transformers.takePairWhenV2(projectClicked))
-                .compose(Transformers.combineLatestPair(pageCount))
-                .subscribe { projectDiscoveryParamsPair: Pair<Pair<DiscoveryParams, Project>, Int> ->
-                    val refTag = RefTagUtils.projectAndRefTagFromParamsAndProject(
-                        projectDiscoveryParamsPair.first.first,
-                        projectDiscoveryParamsPair.first.second
-                    )
-                    val cookieRefTag = RefTagUtils.storedCookieRefTagForProject(
-                        projectDiscoveryParamsPair.first.second,
-                        cookieManager,
-                        sharedPreferences
-                    )
-                    val projectData = builder()
-                        .refTagFromIntent(refTag.second)
-                        .refTagFromCookie(cookieRefTag)
-                        .project(projectDiscoveryParamsPair.first.second)
-                        .build()
-
-                    analyticEvents.trackDiscoverSearchResultProjectCATClicked(
-                        projectDiscoveryParamsPair.first.first,
-                        projectData,
-                        projectDiscoveryParamsPair.second,
-                        defaultSort
-                    )
-                }
-                .addToDisposable(disposables)
-
-            val selectedProject =
-                Observable.combineLatest<String, List<Project>, Pair<String, List<Project>>>(
-                    search,
-                    projects
-                ) { a: String, b: List<Project> ->
-                    Pair.create(a, b)
-                }
-                    .compose(Transformers.takePairWhenV2(projectClicked))
-                    .map { searchTermAndProjectsAndProjectClicked: Pair<Pair<String, List<Project>>, Project> ->
-                        val searchTerm = searchTermAndProjectsAndProjectClicked.first.first
-                        val currentProjects = searchTermAndProjectsAndProjectClicked.first.second
-                        val projectClicked = searchTermAndProjectsAndProjectClicked.second
-                        projectAndRefTag(searchTerm, currentProjects, projectClicked)
-                    }
-
-            selectedProject.subscribe {
-                if (it.first.launchedAt() == DateTimeAdapter().decode(CustomTypeValue.fromRawValue(0)) &&
-                    ffClient.getBoolean(FlagKey.ANDROID_PRE_LAUNCH_SCREEN)
-                ) {
-                    startPreLaunchProjectActivity.onNext(it)
-                } else {
-                    startProjectActivity.onNext(it)
-                }
+                analyticEvents.trackSearchCTAButtonClicked(defaultParams)
             }
-                .addToDisposable(disposables)
-
-            params
-                .compose(Transformers.takePairWhenV2(discoverEnvelope))
-                .compose(Transformers.combineLatestPair(pageCount))
-                .filter { it: Pair<Pair<DiscoveryParams, DiscoverEnvelope>, Int> ->
-                    (
-                        it.first.first.term().isNotNull() &&
-                            it.first.first.term()?.isPresent() ?: false &&
-                            it.first.first.sort() != defaultSort &&
-                            it.second.intValueOrZero() == 1
-                        )
-                }
-                .distinct()
-                .subscribe { it: Pair<Pair<DiscoveryParams, DiscoverEnvelope>, Int> ->
-                    analyticEvents.trackSearchResultPageViewed(
-                        it.first.first,
-                        it.first.second.stats()?.count() ?: 0,
-                        defaultSort
-                    )
-                }
-                .addToDisposable(disposables)
-
-            analyticEvents.trackSearchCTAButtonClicked(defaultParams)
         }
 
         override fun onCleared() {

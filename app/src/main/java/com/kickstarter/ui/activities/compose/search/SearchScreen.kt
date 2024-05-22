@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.Scaffold
 import androidx.compose.material.ScaffoldState
@@ -32,6 +31,11 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.paging.PagingData
+import androidx.paging.compose.LazyPagingItems
+import androidx.paging.compose.collectAsLazyPagingItems
+import androidx.paging.compose.itemContentType
+import androidx.paging.compose.itemKey
 import com.kickstarter.R
 import com.kickstarter.libs.Environment
 import com.kickstarter.libs.utils.NumberUtils
@@ -48,6 +52,7 @@ import com.kickstarter.ui.viewholders.compose.search.FeaturedSearchViewHolder
 import com.kickstarter.ui.viewholders.compose.search.ProjectSearchViewHolder
 import com.kickstarter.ui.views.compose.search.SearchEmptyView
 import com.kickstarter.ui.views.compose.search.SearchTopBar
+import kotlinx.coroutines.flow.flowOf
 
 @Composable
 @Preview(name = "Light", uiMode = Configuration.UI_MODE_NIGHT_NO)
@@ -59,14 +64,14 @@ fun SearchScreenPreviewNonEmpty() {
             scaffoldState = rememberScaffoldState(),
             isLoading = false,
             isPopularList = true,
-            itemsList = List(100) {
+            projects = flowOf(PagingData.from(List(100) {
                 Project.builder()
                     .name("This is a test $it")
                     .pledged((it * 2).toDouble())
                     .goal(100.0)
                     .state(if (it in 10..20) Project.STATE_SUBMITTED else Project.STATE_LIVE)
                     .build()
-            },
+            })).collectAsLazyPagingItems(),
             lazyColumnListState = rememberLazyListState(),
             showEmptyView = false,
             onSearchTermChanged = {},
@@ -84,7 +89,7 @@ fun SearchScreenPreviewEmpty() {
             onBackClicked = { },
             scaffoldState = rememberScaffoldState(),
             isLoading = true,
-            itemsList = listOf(),
+            projects = flowOf(PagingData.from(emptyList<Project>())).collectAsLazyPagingItems(),
             lazyColumnListState = rememberLazyListState(),
             showEmptyView = true,
             onSearchTermChanged = {},
@@ -112,7 +117,7 @@ fun SearchScreen(
     scaffoldState: ScaffoldState,
     isPopularList: Boolean = true,
     isLoading: Boolean,
-    itemsList: List<Project> = listOf(),
+    projects: LazyPagingItems<Project> = flowOf(PagingData.from(listOf<Project>())).collectAsLazyPagingItems(),
     lazyColumnListState: LazyListState,
     showEmptyView: Boolean,
     onSearchTermChanged: (String) -> Unit,
@@ -136,6 +141,7 @@ fun SearchScreen(
         },
         backgroundColor = colors.kds_white
     ) { padding ->
+
         if (showEmptyView) {
             SearchEmptyView(
                 modifier = Modifier.testTag(SearchScreenTestTag.EMPTY_VIEW.name),
@@ -155,7 +161,19 @@ fun SearchScreen(
                 state = lazyColumnListState,
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                itemsIndexed(itemsList) { index, project ->
+                // Here we use the standard items API
+                items(
+                    count = projects.itemCount,
+                    // Here we use the new itemKey extension on LazyPagingItems to
+                    // handle placeholders automatically, ensuring you only need to provide
+                    // keys for real items
+                    key = projects.itemKey { it.id() },
+                    // Similarly, itemContentType lets you set a custom content type for each item
+                    contentType = projects.itemContentType { "contentType" }
+                ) { index ->
+                    // As the standard items call provides only the index, we get the item
+                    // directly from our lazyPagingItems
+                    val project = projects[index] ?: Project.builder().build()
                     if (index == 0 && isPopularList) {
                         Spacer(modifier = Modifier.height(dimensions.paddingMedium))
 
@@ -189,7 +207,7 @@ fun SearchScreen(
                             onItemClicked(project)
                         }
 
-                        if (itemsList.size > 1) {
+                        if (projects.itemCount > 1) {
                             Spacer(modifier = Modifier.height(dimensions.paddingMedium))
 
                             KSDividerLineGrey()
@@ -213,7 +231,7 @@ fun SearchScreen(
                             onItemClicked(project)
                         }
 
-                        if (index < itemsList.size - 1) {
+                        if (index < projects.itemCount - 1) {
                             Spacer(modifier = Modifier.height(dimensions.paddingXSmall))
 
                             KSDividerLineGrey()
@@ -226,7 +244,7 @@ fun SearchScreen(
                 }
 
                 item(isLoading) {
-                    if (isLoading && itemsList.isNotEmpty()) {
+                    if (isLoading && projects.itemCount > 0) {
                         Spacer(modifier = Modifier.height(dimensions.paddingMedium))
 
                         KSCircularProgressIndicator(
@@ -241,7 +259,7 @@ fun SearchScreen(
             }
         }
 
-        if (isLoading && itemsList.isEmpty()) {
+        if (isLoading && projects.itemCount == 0) {
             Box(
                 modifier = Modifier
                     .testTag(SearchScreenTestTag.LOADING_VIEW.name)

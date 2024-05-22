@@ -68,7 +68,7 @@ class SearchScreenTest : KSRobolectricTestCase() {
                     lazyColumnListState = rememberLazyListState(),
                     showEmptyView = false,
                     isPopularList = true,
-                    itemsList = List(20) {
+                    projects = List(20) {
                         Project.builder()
                             .name("This is a test $it")
                             .pledged((it * 2).toDouble())
@@ -114,7 +114,7 @@ class SearchScreenTest : KSRobolectricTestCase() {
                     lazyColumnListState = rememberLazyListState(),
                     showEmptyView = false,
                     isPopularList = false,
-                    itemsList = List(20) {
+                    projects = List(20) {
                         Project.builder()
                             .name("This is a test $it")
                             .pledged((it * 2).toDouble())
@@ -183,7 +183,7 @@ class SearchScreenTest : KSRobolectricTestCase() {
                     lazyColumnListState = rememberLazyListState(),
                     showEmptyView = false,
                     isPopularList = false,
-                    itemsList = List(20) {
+                    projects = List(20) {
                         Project.builder()
                             .name("This is a test $it")
                             .pledged((it * 2).toDouble())
@@ -230,7 +230,7 @@ class SearchScreenTest : KSRobolectricTestCase() {
                     lazyColumnListState = rememberLazyListState(),
                     showEmptyView = false,
                     isPopularList = false,
-                    itemsList = List(20) {
+                    projects = List(20) {
                         Project.builder()
                             .name("This is a test $it")
                             .pledged((it * 2).toDouble())
@@ -273,7 +273,7 @@ class SearchScreenTest : KSRobolectricTestCase() {
                     lazyColumnListState = rememberLazyListState(),
                     showEmptyView = false,
                     isPopularList = false,
-                    itemsList = List(20) {
+                    projects = List(20) {
                         Project.builder()
                             .name("This is a test $it")
                             .pledged((it * 2).toDouble())
