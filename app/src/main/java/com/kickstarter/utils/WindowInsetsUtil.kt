@@ -2,9 +2,10 @@ package com.kickstarter.utils
 import android.view.View
 import android.view.ViewGroup
 import android.view.Window
-import androidx.core.view.WindowCompat
 import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.updateLayoutParams
 
 data class LayoutPaddingConfig(
     val layout: ViewGroup,
@@ -19,33 +20,30 @@ object WindowInsetsUtil {
      * for system bars (status bar, navigation bar).
      *
      * @param window The window of the activity or fragment.
-     * @param rootView The root view where the window insets will be applied.
-     * @param mainLayout The layout that needs padding adjustments to avoid content
-     * being hidden by system bars.
-     * @param applyTopPadding If true, applies padding to the top (status bar).
-     * @param applyBottomPadding If true, applies padding to the bottom (navigation bar).
+     * @param rootView The root view where the window insets will be applied..
      */
     fun manageEdgeToEdge(
         window: Window,
-        rootView: View,
-        mainLayout: ViewGroup,
-        applyTopPadding: Boolean = true,
-        applyBottomPadding: Boolean = true
+        rootView: View
     ) {
         WindowCompat.setDecorFitsSystemWindows(window, false)
 
-        ViewCompat.setOnApplyWindowInsetsListener(rootView) { _, insets ->
-            val systemBarsInsets = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+        ViewCompat.setOnApplyWindowInsetsListener(rootView) { v, windowInsets ->
+            val insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars())
+            // Apply the insets as a margin to the view. This solution sets
+            // only the bottom, left, and right dimensions, but you can apply whichever
+            // insets are appropriate to your layout. You can also update the view padding
+            // if that's more appropriate.
+            v.updateLayoutParams<ViewGroup.MarginLayoutParams> {
+                leftMargin = insets.left
+                bottomMargin = insets.bottom
+                rightMargin = insets.right
+                topMargin = insets.top
+            }
 
-            // Apply padding based on the flags
-            mainLayout.setPadding(
-                mainLayout.left,
-                if (applyTopPadding) systemBarsInsets.top else mainLayout.top,
-                mainLayout.right,
-                if (applyBottomPadding) systemBarsInsets.bottom else mainLayout.bottom
-            )
+            // Return CONSUMED if you don't want want the window insets to keep passing
+            // down to descendant views.
             WindowInsetsCompat.CONSUMED
-
         }
     }
 
@@ -76,7 +74,6 @@ object WindowInsetsUtil {
                 )
             }
             WindowInsetsCompat.CONSUMED
-
         }
     }
 }

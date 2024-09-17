@@ -40,10 +40,7 @@ class ProfileActivity : ComponentActivity() {
         binding = ProfileLayoutBinding.inflate(layoutInflater)
         WindowInsetsUtil.manageEdgeToEdge(
             window,
-            binding.root,
-            binding.profileActivityMainLayout,
-            applyTopPadding = true,
-            applyBottomPadding = false
+            binding.root
         )
         setContentView(binding.root)
 

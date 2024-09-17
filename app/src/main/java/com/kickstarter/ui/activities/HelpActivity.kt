@@ -67,10 +67,7 @@ open class HelpActivity : ComponentActivity() {
         binding = HelpLayoutBinding.inflate(layoutInflater)
         WindowInsetsUtil.manageEdgeToEdge(
             window,
-            binding.root,
-            binding.helpMainLayout,
-            applyTopPadding = true,
-            applyBottomPadding = false
+            binding.root
         )
         setContentView(binding.root)
 

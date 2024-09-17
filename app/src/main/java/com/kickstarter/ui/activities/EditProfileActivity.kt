@@ -35,10 +35,7 @@ class EditProfileActivity : ComponentActivity() {
         binding = ActivityEditProfileBinding.inflate(layoutInflater)
         WindowInsetsUtil.manageEdgeToEdge(
             window,
-            binding.root,
-            binding.editProfileAppbarLayout,
-            applyTopPadding = true,
-            applyBottomPadding = false
+            binding.root
         )
         setContentView(binding.root)
         setUpConnectivityStatusCheck(lifecycle)

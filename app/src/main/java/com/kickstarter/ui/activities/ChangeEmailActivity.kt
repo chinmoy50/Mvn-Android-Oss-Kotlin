@@ -17,7 +17,6 @@ import com.kickstarter.libs.utils.extensions.getEnvironment
 import com.kickstarter.ui.extensions.onChange
 import com.kickstarter.ui.extensions.setUpConnectivityStatusCheck
 import com.kickstarter.ui.extensions.showSnackbar
-import com.kickstarter.utils.WindowInsetsUtil
 import com.kickstarter.viewmodels.ChangeEmailViewModel
 import io.reactivex.android.schedulers.AndroidSchedulers
 import io.reactivex.disposables.CompositeDisposable

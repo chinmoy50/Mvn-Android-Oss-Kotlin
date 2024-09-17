@@ -72,10 +72,7 @@ class NotificationsActivity : ComponentActivity() {
         binding = ActivityNotificationsBinding.inflate(layoutInflater)
         WindowInsetsUtil.manageEdgeToEdge(
             window,
-            binding.root,
-            binding.notificationMainLayout,
-            applyTopPadding = true,
-            applyBottomPadding = false
+            binding.root
         )
         this.getEnvironment()?.let { env ->
             viewModelFactory = NotificationsViewModel.Factory(env)

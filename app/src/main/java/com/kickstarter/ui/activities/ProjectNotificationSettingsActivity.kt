@@ -22,10 +22,7 @@ class ProjectNotificationSettingsActivity :
         binding = ProjectNotificationSettingsLayoutBinding.inflate(layoutInflater)
         WindowInsetsUtil.manageEdgeToEdge(
             window,
-            binding.root,
-            binding.projectNotificationSettingsMainLayout,
-            applyTopPadding = true,
-            applyBottomPadding = true
+            binding.root
         )
         setContentView(binding.root)
 

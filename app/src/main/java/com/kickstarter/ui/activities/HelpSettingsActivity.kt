@@ -41,10 +41,8 @@ class HelpSettingsActivity : AppCompatActivity() {
         binding = ActivityHelpSettingsBinding.inflate(layoutInflater)
         WindowInsetsUtil.manageEdgeToEdge(
             window,
-            binding.root,
-            binding.toolbarLayout,
-            applyTopPadding = true,
-            applyBottomPadding = false)
+            binding.root
+        )
         val view = binding.root
         setContentView(view)
 
