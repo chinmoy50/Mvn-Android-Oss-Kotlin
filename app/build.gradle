@@ -52,10 +52,10 @@ if (file('signing.gradle').exists()) {
 
 android {
     defaultConfig {
-        compileSdk 35
+        compileSdkPreview = "VanillaIceCream"
         applicationId "com.kickstarter"
         minSdkVersion 24
-        targetSdkVersion 35
+targetSdkPreview = "VanillaIceCream"
         testApplicationId "com.kickstarter.internal.debug.test"
         testInstrumentationRunner "com.kickstarter.screenshoot.testing.KSScreenShotTestRunner"
 

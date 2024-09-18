@@ -17,6 +17,7 @@ import com.kickstarter.libs.utils.extensions.getEnvironment
 import com.kickstarter.ui.extensions.onChange
 import com.kickstarter.ui.extensions.setUpConnectivityStatusCheck
 import com.kickstarter.ui.extensions.showSnackbar
+import com.kickstarter.utils.WindowInsetsUtil
 import com.kickstarter.viewmodels.ChangeEmailViewModel
 import io.reactivex.android.schedulers.AndroidSchedulers
 import io.reactivex.disposables.CompositeDisposable
@@ -41,13 +42,10 @@ class ChangeEmailActivity : AppCompatActivity() {
         }
 
         binding = ActivityChangeEmailBinding.inflate(layoutInflater)
-//        WindowInsetsUtil.manageEdgeToEdge(
-//            window,
-//            binding.root,
-//            binding.changeEmailLayout,
-//            true,
-//            false
-//        )
+        WindowInsetsUtil.manageEdgeToEdge(
+            window,
+            binding.root,
+        )
         setContentView(binding.root)
         setSupportActionBar(binding.changeEmailActivityToolbar.changeEmailToolbar)
 

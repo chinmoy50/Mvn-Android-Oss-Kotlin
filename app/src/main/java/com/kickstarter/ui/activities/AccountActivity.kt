@@ -72,7 +72,6 @@ class AccountActivity : AppCompatActivity() {
             window,
             binding.root
         )
-
         setContentView(binding.root)
 
         setUpConnectivityStatusCheck(lifecycle)

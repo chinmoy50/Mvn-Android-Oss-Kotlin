@@ -58,7 +58,7 @@ class SettingsActivity : AppCompatActivity() {
         binding = SettingsLayoutBinding.inflate(layoutInflater)
         WindowInsetsUtil.manageEdgeToEdge(
             window,
-            binding.root
+            binding.root,
         )
         this.getEnvironment()?.let { env ->
             viewModelFactory = SettingsViewModel.Factory(env)

@@ -89,6 +89,7 @@ import com.kickstarter.ui.fragments.BackingFragment
 import com.kickstarter.ui.fragments.CancelPledgeFragment
 import com.kickstarter.ui.fragments.PledgeFragment
 import com.kickstarter.ui.fragments.RewardsFragment
+import com.kickstarter.utils.WindowInsetsUtil
 import com.kickstarter.viewmodels.projectpage.AddOnsViewModel
 import com.kickstarter.viewmodels.projectpage.CheckoutFlowViewModel
 import com.kickstarter.viewmodels.projectpage.ConfirmDetailsViewModel
@@ -147,6 +148,7 @@ class ProjectPageActivity :
     private val animDuration = 200L
     private lateinit var binding: ActivityProjectPageBinding
 
+
     private var disposables = CompositeDisposable()
 
     private val pagerAdapterList = mutableListOf(
@@ -170,13 +172,10 @@ class ProjectPageActivity :
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityProjectPageBinding.inflate(layoutInflater)
-//        WindowInsetsUtil.manageEdgeToEdge(
-//            window,
-//            binding.root,
-//            binding.snackbarAnchor,
-//            applyTopPadding = false,
-//            applyBottomPadding = true
-//        )
+        WindowInsetsUtil.manageEdgeToEdge(
+            window,
+            binding.root,
+        )
         setContentView(binding.root)
         setUpConnectivityStatusCheck(lifecycle)
 

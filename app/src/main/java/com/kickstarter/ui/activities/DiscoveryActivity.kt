@@ -34,6 +34,7 @@ import com.kickstarter.ui.extensions.showSuccessSnackBar
 import com.kickstarter.ui.fragments.ConsentManagementDialogFragment
 import com.kickstarter.ui.fragments.DiscoveryFragment
 import com.kickstarter.ui.fragments.DiscoveryFragment.Companion.newInstance
+import com.kickstarter.utils.WindowInsetsUtil
 import com.kickstarter.viewmodels.DiscoveryViewModel
 import rx.android.schedulers.AndroidSchedulers
 import rx.schedulers.Schedulers
@@ -54,7 +55,10 @@ class DiscoveryActivity : BaseActivity<DiscoveryViewModel.ViewModel>() {
 
         super.onCreate(savedInstanceState)
         binding = DiscoveryLayoutBinding.inflate(layoutInflater)
-
+        WindowInsetsUtil.manageEdgeToEdge(
+            window,
+            binding.root
+        )
         setContentView(binding.root)
         environment()
 
