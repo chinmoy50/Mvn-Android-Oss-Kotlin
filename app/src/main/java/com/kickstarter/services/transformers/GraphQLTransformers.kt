@@ -741,6 +741,8 @@ fun backingTransformer(backingGr: fragment.Backing?): Backing {
 
     val isPostCampaign = backingGr?.isPostCampaign ?: false
 
+    val backingDetailsUrl = backingGr?.backingDetailsPageRoute()
+
     return Backing.builder()
         .amount(backingGr?.amount()?.fragments()?.amount()?.amount()?.toDouble() ?: 0.0)
         .bonusAmount(backingGr?.bonusAmount()?.fragments()?.amount()?.amount()?.toDouble() ?: 0.0)
@@ -763,6 +765,7 @@ fun backingTransformer(backingGr: fragment.Backing?): Backing {
         .cancelable(backingGr?.cancelable() ?: false)
         .completedByBacker(completedByBacker)
         .isPostCampaign(isPostCampaign)
+        .backingDetailsUrl(backingDetailsUrl)
         .build()
 }
 

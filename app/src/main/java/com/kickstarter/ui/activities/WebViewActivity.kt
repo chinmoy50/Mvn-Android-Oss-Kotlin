@@ -5,6 +5,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.addCallback
 import com.kickstarter.databinding.WebViewLayoutBinding
 import com.kickstarter.ui.IntentKey
+import com.kickstarter.ui.IntentKey.REFRESH_PROJECT_PAGE
 import com.kickstarter.ui.extensions.finishWithAnimation
 import com.kickstarter.ui.views.KSWebView
 
@@ -26,6 +27,13 @@ class WebViewActivity : ComponentActivity() {
             override fun pageIntercepted(url: String) {
                 if (url.contains("authenticate")) {
                     finish()
+                }
+
+                val regex = Regex("""checkouts/\d+/thanks""")
+
+                if (regex.containsMatchIn(url)) {
+                    println("Thanks page Pattern found!")
+                    finishWithAnimation(withResult = url.toString(), intentKey = REFRESH_PROJECT_PAGE)
                 }
             }
 

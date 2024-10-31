@@ -56,4 +56,5 @@ object IntentKey {
     const val PREVIOUS_SCREEN = "com.kickstarter.kickstarter.previous_screen"
     const val OAUTH_REDIRECT_URL = "com.kickstarter.kickstarter.oauth_redirect_url"
     const val REFRESH_PPO_LIST = "com.kickstarter.kickstarter.refresh_ppo_list"
+    const val REFRESH_PROJECT_PAGE = "com.kickstarter.kickstarter.refresh_project_page"
 }

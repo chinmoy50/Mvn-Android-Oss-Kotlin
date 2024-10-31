@@ -30,11 +30,11 @@ class Backing private constructor(
     private val rewardId: Long?,
     private val sequence: Long,
     private val shippingAmount: Float,
-    @ConfigFetchHandler.FetchResponse.Status
     private val status: String,
     private val addOns: List<Reward>?,
     private val bonusAmount: Double,
-    private val isPostCampaign: Boolean
+    private val isPostCampaign: Boolean,
+    private val backingDetailsUrl: String?,
 ) : Parcelable, Relay {
     fun amount() = this.amount
     fun backer() = this.backer
@@ -63,6 +63,7 @@ class Backing private constructor(
     fun addOns() = this.addOns
     fun bonusAmount() = this.bonusAmount
     fun isPostCampaign() = this.isPostCampaign
+    fun backingDetailsUrl() = this.backingDetailsUrl
 
     @Parcelize
     data class Builder(
@@ -88,11 +89,11 @@ class Backing private constructor(
         private var rewardId: Long? = null,
         private var sequence: Long = 0L,
         private var shippingAmount: Float = 0.0f,
-        @ConfigFetchHandler.FetchResponse.Status
         private var status: String = "",
         private var addOns: List<Reward>? = null,
         private var bonusAmount: Double = 0.0,
-        private var isPostCampaign: Boolean = false
+        private var isPostCampaign: Boolean = false,
+        private var backingDetailsUrl: String? = null
     ) : Parcelable {
         fun amount(amount: Double?) = apply { this.amount = amount ?: 0.0 }
         fun backer(backer: User?) = apply { this.backer = backer }
@@ -120,6 +121,7 @@ class Backing private constructor(
         fun addOns(addOns: List<Reward>?) = apply { this.addOns = addOns ?: emptyList() }
         fun bonusAmount(bonusAmount: Double?) = apply { this.bonusAmount = bonusAmount ?: 0.0 }
         fun isPostCampaign(isPostCampaign: Boolean) = apply { this.isPostCampaign = isPostCampaign }
+        fun backingDetailsUrl(url: String?) = apply { this.backingDetailsUrl = url}
         fun build() = Backing(
             amount = amount,
             backer = backer,
@@ -146,7 +148,8 @@ class Backing private constructor(
             status = status,
             addOns = addOns,
             bonusAmount = bonusAmount,
-            isPostCampaign = isPostCampaign
+            isPostCampaign = isPostCampaign,
+            backingDetailsUrl = backingDetailsUrl
         )
     }
 
@@ -176,7 +179,8 @@ class Backing private constructor(
         status = status,
         addOns = addOns,
         bonusAmount = bonusAmount,
-        isPostCampaign = isPostCampaign
+        isPostCampaign = isPostCampaign,
+        backingDetailsUrl = backingDetailsUrl
     )
 
     override fun equals(other: Any?): Boolean {
@@ -206,7 +210,8 @@ class Backing private constructor(
                 shippingAmount() == other.shippingAmount() &&
                 status() == other.status() &&
                 addOns() == other.addOns() &&
-                bonusAmount() == other.bonusAmount()
+                bonusAmount() == other.bonusAmount() &&
+                backingDetailsUrl() == other.backingDetailsUrl()
         }
         return equals
     }

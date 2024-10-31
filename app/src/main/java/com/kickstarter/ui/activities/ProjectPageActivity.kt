@@ -157,6 +157,11 @@ class ProjectPageActivity :
             data?.let {
                 viewModel.inputs.closeFullScreenVideo(it)
             }
+
+            val thanksPageReached = result.data?.getStringExtra(IntentKey.REFRESH_PROJECT_PAGE)
+            thanksPageReached?.let {
+                refreshProject()
+            }
         }
     }
 
@@ -242,6 +247,8 @@ class ProjectPageActivity :
                     rewardsSelectionViewModel.provideProjectData(it)
                     addOnsViewModel.provideProjectData(it)
                 }
+
+                setClickListeners(it, requireNotNull(environment))
             }.addToDisposable(disposables)
 
         this.viewModel.outputs.updateTabs()
@@ -488,8 +495,6 @@ class ProjectPageActivity :
                 handleNativeCheckoutBackPress()
             }
         }
-
-        setClickListeners()
 
         if (resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) {
             binding.projectAppBarLayout.setExpanded(false)
@@ -990,9 +995,24 @@ class ProjectPageActivity :
         }
     }
 
-    private fun setClickListeners() {
+    private fun setClickListeners(projectData: ProjectData? = null, environment: Environment) {
         binding.pledgeContainerLayout.pledgeActionButton.setOnClickListener {
-            this.viewModel.inputs.nativeProjectActionButtonClicked()
+            //this.viewModel.inputs.nativeProjectActionButtonClicked()
+            // TODO open webview for checkout
+
+            val backerUrl = projectData?.project()?.backing()?.backingDetailsUrl()
+            val newPledgeUrl = "${environment.webEndpoint()}/projects/${projectData?.project()?.slug()}/pledge/new"
+
+            val intent: Intent = if (backerUrl == null) {
+                Intent(this, WebViewActivity::class.java)
+                .putExtra(IntentKey.URL, newPledgeUrl)
+            } else {
+                Intent(this, WebViewActivity::class.java)
+                    .putExtra(IntentKey.URL, backerUrl)
+            }
+
+            startForResult.launch(intent)
+            overridePendingTransition(R.anim.slide_up, R.anim.fade_out)
         }
 
         binding.pledgeContainerLayout.pledgeToolbar.setNavigationOnClickListener {

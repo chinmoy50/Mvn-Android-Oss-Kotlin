@@ -160,6 +160,7 @@ fragment backing on Backing {
     pledgedOn
     backerCompleted
     isPostCampaign
+    backingDetailsPageRoute(type: url)
     project {
         ... project
     }
