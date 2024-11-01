@@ -998,17 +998,17 @@ class ProjectPageActivity :
     private fun setClickListeners(projectData: ProjectData? = null, environment: Environment) {
         binding.pledgeContainerLayout.pledgeActionButton.setOnClickListener {
             //this.viewModel.inputs.nativeProjectActionButtonClicked()
-            // TODO open webview for checkout
+            // TODO  add feature flag to load within a webview
 
-            val backerUrl = projectData?.project()?.backing()?.backingDetailsUrl()
+            val backerDetailsUrl = projectData?.project()?.backing()?.backingDetailsUrl()
             val newPledgeUrl = "${environment.webEndpoint()}/projects/${projectData?.project()?.slug()}/pledge/new"
 
-            val intent: Intent = if (backerUrl == null) {
+            val intent: Intent = if (backerDetailsUrl == null) {
                 Intent(this, WebViewActivity::class.java)
                 .putExtra(IntentKey.URL, newPledgeUrl)
             } else {
                 Intent(this, WebViewActivity::class.java)
-                    .putExtra(IntentKey.URL, backerUrl)
+                    .putExtra(IntentKey.URL, backerDetailsUrl)
             }
 
             startForResult.launch(intent)
