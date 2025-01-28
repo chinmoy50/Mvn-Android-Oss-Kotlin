@@ -51,7 +51,6 @@ import com.kickstarter.libs.KSString
 import com.kickstarter.libs.MessagePreviousScreenType
 import com.kickstarter.libs.ProjectPagerTabs
 import com.kickstarter.libs.featureflag.FeatureFlagClientType
-import com.kickstarter.libs.featureflag.FlagKey
 import com.kickstarter.libs.utils.ApplicationUtils
 import com.kickstarter.libs.utils.UrlUtils
 import com.kickstarter.libs.utils.ViewUtils
@@ -87,7 +86,6 @@ import com.kickstarter.ui.extensions.startUpdatesActivity
 import com.kickstarter.ui.extensions.startVideoActivity
 import com.kickstarter.ui.fragments.BackingFragment
 import com.kickstarter.ui.fragments.CancelPledgeFragment
-import com.kickstarter.ui.fragments.PledgeFragment
 import com.kickstarter.ui.fragments.RewardsFragment
 import com.kickstarter.utils.WindowInsetsUtil
 import com.kickstarter.viewmodels.projectpage.AddOnsViewModel
@@ -111,10 +109,16 @@ import kotlinx.coroutines.launch
 
 const val REFRESH = "refresh"
 
+interface PledgeDelegate {
+    fun pledgePaymentSuccessfullyUpdated()
+    fun pledgeSuccessfullyCreated(checkoutDataAndPledgeData: Pair<CheckoutData, PledgeData>)
+    fun pledgeSuccessfullyUpdated()
+}
+
 class ProjectPageActivity :
     AppCompatActivity(),
     CancelPledgeFragment.CancelPledgeDelegate,
-    PledgeFragment.PledgeDelegate,
+    PledgeDelegate,
     BackingFragment.BackingDelegate {
     private lateinit var ksString: KSString
 
@@ -1157,8 +1161,7 @@ class ProjectPageActivity :
         pledgeDataAndPledgeReason: Pair<PledgeData, PledgeReason>,
         ffClient: FeatureFlagClientType
     ) {
-        val ffEnabled = ffClient.getBoolean(FlagKey.ANDROID_FIX_PLEDGE_REFACTOR)
-        val pledgeFragment = this.selectPledgeFragment(pledgeDataAndPledgeReason.first, pledgeDataAndPledgeReason.second, ffEnabled)
+        val pledgeFragment = this.selectPledgeFragment(pledgeDataAndPledgeReason.first, pledgeDataAndPledgeReason.second)
         val tag = pledgeFragment::class.java.simpleName
         supportFragmentManager
             .beginTransaction()
