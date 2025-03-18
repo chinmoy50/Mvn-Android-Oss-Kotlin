@@ -38,7 +38,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import com.kickstarter.R
 import com.kickstarter.libs.featureflag.FlagKey
 import com.kickstarter.libs.utils.extensions.getEnvironment
-import com.kickstarter.ui.activities.compose.search.SearchScreenTestTag
+import com.kickstarter.features.search.ui.compose.SearchScreenTestTag
 import com.kickstarter.ui.compose.designsystem.IconPillButton
 import com.kickstarter.ui.compose.designsystem.KSTheme
 import com.kickstarter.ui.compose.designsystem.KSTheme.colors
@@ -70,15 +70,9 @@ fun SearchTopBar(
     onValueChanged: (String) -> Unit,
     selectedFilterCounts: Map<String, Int>,
     onSortPressed: () -> Unit = {},
-    onCategoryPressed: () -> Unit = {}
+    onCategoryPressed: () -> Unit = {},
+    shouldShowPillBar: Boolean = true
 ) {
-    val context = LocalContext.current
-    val isPreview = LocalInspectionMode.current
-    val ffEnabled = if (!isPreview) {
-        context.getEnvironment()?.featureFlagClient()?.getBoolean(FlagKey.ANDROID_SEARCH_FILTER) ?: false
-    } else {
-        true
-    }
 
     var value by rememberSaveable { mutableStateOf("") }
     val keyboardController = LocalSoftwareKeyboardController.current
@@ -164,7 +158,7 @@ fun SearchTopBar(
                 singleLine = true
             )
         }
-        if (ffEnabled) {
+        if (shouldShowPillBar) {
             PillBar(
                 selectedFilterCounts,
                 onSortPressed,

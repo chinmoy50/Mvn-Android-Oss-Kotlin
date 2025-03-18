@@ -45,7 +45,7 @@ import com.kickstarter.R
 import com.kickstarter.libs.utils.extensions.deadlineCountdown
 import com.kickstarter.models.Photo
 import com.kickstarter.models.Project
-import com.kickstarter.ui.activities.compose.search.CardProjectState
+import com.kickstarter.ui.compose.designsystem.CardProjectState
 import com.kickstarter.ui.compose.designsystem.KSProjectCardLarge
 import com.kickstarter.ui.compose.designsystem.KSTheme
 import com.kickstarter.viewmodels.projectpage.SimilarProjectsUiState

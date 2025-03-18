@@ -11,6 +11,8 @@ import androidx.compose.ui.test.performTextInput
 import androidx.test.platform.app.InstrumentationRegistry
 import com.kickstarter.KSRobolectricTestCase
 import com.kickstarter.R
+import com.kickstarter.features.search.ui.compose.SearchAndFilterScreen
+import com.kickstarter.features.search.ui.compose.SearchScreenTestTag
 import com.kickstarter.models.Project
 import com.kickstarter.ui.compose.designsystem.KSTheme
 import org.junit.Test
@@ -35,7 +37,7 @@ class SearchScreenTest : KSRobolectricTestCase() {
     fun testEmptyComponentsVisible() {
         composeTestRule.setContent {
             KSTheme {
-                SearchScreen(
+                SearchAndFilterScreen(
                     onBackClicked = { },
                     scaffoldState = rememberScaffoldState(),
                     isLoading = false,
@@ -61,7 +63,7 @@ class SearchScreenTest : KSRobolectricTestCase() {
     fun testPopularListComponentsVisible() {
         composeTestRule.setContent {
             KSTheme {
-                SearchScreen(
+                SearchAndFilterScreen(
                     onBackClicked = { },
                     scaffoldState = rememberScaffoldState(),
                     isLoading = false,
@@ -107,7 +109,7 @@ class SearchScreenTest : KSRobolectricTestCase() {
     fun testSearchedListComponentsVisible() {
         composeTestRule.setContent {
             KSTheme {
-                SearchScreen(
+                SearchAndFilterScreen(
                     onBackClicked = { },
                     scaffoldState = rememberScaffoldState(),
                     isLoading = false,
@@ -150,7 +152,7 @@ class SearchScreenTest : KSRobolectricTestCase() {
     fun testLoadingComponentsEmptyListVisible() {
         composeTestRule.setContent {
             KSTheme {
-                SearchScreen(
+                SearchAndFilterScreen(
                     onBackClicked = { },
                     scaffoldState = rememberScaffoldState(),
                     isLoading = true,
@@ -176,7 +178,7 @@ class SearchScreenTest : KSRobolectricTestCase() {
     fun testLoadingComponentsWithListVisible() {
         composeTestRule.setContent {
             KSTheme {
-                SearchScreen(
+                SearchAndFilterScreen(
                     onBackClicked = { },
                     scaffoldState = rememberScaffoldState(),
                     isLoading = true,
@@ -223,7 +225,7 @@ class SearchScreenTest : KSRobolectricTestCase() {
 
         composeTestRule.setContent {
             KSTheme {
-                SearchScreen(
+                SearchAndFilterScreen(
                     onBackClicked = { backClickedCount++ },
                     scaffoldState = rememberScaffoldState(),
                     isLoading = false,
@@ -266,7 +268,7 @@ class SearchScreenTest : KSRobolectricTestCase() {
 
         composeTestRule.setContent {
             KSTheme {
-                SearchScreen(
+                SearchAndFilterScreen(
                     onBackClicked = { },
                     scaffoldState = rememberScaffoldState(),
                     isLoading = false,

@@ -20,6 +20,7 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import com.kickstarter.R
+import com.kickstarter.features.search.ui.compose.SearchAndFilterScreen
 import com.kickstarter.features.search.viewmodel.FilterMenuViewModel
 import com.kickstarter.features.search.viewmodel.SearchAndFilterViewModel
 import com.kickstarter.libs.RefTag
@@ -36,7 +37,6 @@ import com.kickstarter.mock.factories.CategoryFactory
 import com.kickstarter.models.Project
 import com.kickstarter.type.ProjectSort
 import com.kickstarter.ui.IntentKey
-import com.kickstarter.ui.activities.compose.search.SearchScreen
 import com.kickstarter.ui.compose.designsystem.KSSnackbarTypes
 import com.kickstarter.ui.compose.designsystem.KickstarterApp
 import com.kickstarter.ui.extensions.setUpConnectivityStatusCheck
@@ -78,7 +78,7 @@ class SearchAndFilterActivity : ComponentActivity() {
 
                 val darModeEnabled = this.isDarkModeEnabled(env = env)
                 KickstarterApp(useDarkTheme = darModeEnabled) {
-                    SearchScreen(
+                    SearchAndFilterScreen(
                         environment = env,
                         onBackClicked = { onBackPressedDispatcher.onBackPressed() },
                         scaffoldState = rememberScaffoldState(),

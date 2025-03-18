@@ -1,4 +1,4 @@
-package com.kickstarter.ui.activities.compose.search
+package com.kickstarter.features.search.ui.compose
 
 import android.content.res.Configuration
 import androidx.compose.foundation.background
@@ -45,13 +45,16 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.kickstarter.R
-import com.kickstarter.features.search.ui.compose.SearchScreenTestTag
 import com.kickstarter.libs.Environment
 import com.kickstarter.libs.utils.NumberUtils
 import com.kickstarter.libs.utils.extensions.deadlineCountdownDetail
 import com.kickstarter.libs.utils.extensions.deadlineCountdownValue
 import com.kickstarter.models.Photo
 import com.kickstarter.models.Project
+import com.kickstarter.ui.activities.compose.search.CategorySelectionSheet
+import com.kickstarter.ui.activities.compose.search.SearchScreenTestTag
+import com.kickstarter.ui.activities.compose.search.getCardProjectState
+import com.kickstarter.ui.activities.compose.search.sampleCategories
 import com.kickstarter.ui.compose.designsystem.CardProjectState
 import com.kickstarter.ui.compose.designsystem.KSCircularProgressIndicator
 import com.kickstarter.ui.compose.designsystem.KSErrorSnackbar
@@ -73,7 +76,7 @@ import kotlinx.coroutines.launch
 @Preview(name = "Dark", uiMode = Configuration.UI_MODE_NIGHT_YES)
 fun SearchScreenPreviewNonEmpty() {
     KSTheme {
-        SearchScreen(
+        SearchAndFilterScreen(
             onBackClicked = { },
             scaffoldState = rememberScaffoldState(),
             errorSnackBarHostState = SnackbarHostState(),
@@ -101,7 +104,7 @@ fun SearchScreenPreviewNonEmpty() {
 @Preview(name = "Dark", uiMode = Configuration.UI_MODE_NIGHT_YES)
 fun SearchScreenPreviewEmpty() {
     KSTheme {
-        SearchScreen(
+        SearchAndFilterScreen(
             onBackClicked = { },
             scaffoldState = rememberScaffoldState(),
             errorSnackBarHostState = SnackbarHostState(),
@@ -127,25 +130,9 @@ enum class SearchScreenTestTag {
     NORMAL_PROJECT_VIEW
 }
 
-fun getCardProjectState(project: Project): CardProjectState {
-    return if (project.isSuccessful)
-        CardProjectState.ENDED_SUCCESSFUL
-    else if (project.isFailed)
-        CardProjectState.ENDED_UNSUCCESSFUL
-    else if (project.postCampaignPledgingEnabled() == true && project.isInPostCampaignPledgingPhase() == true)
-        CardProjectState.LATE_PLEDGES_ACTIVE
-    else if (!project.isLive)
-        CardProjectState.LAUNCHING_SOON
-    else if (project.isLive)
-        CardProjectState.LIVE
-    else {
-        CardProjectState.LIVE
-    }
-}
-
 @OptIn(ExperimentalMaterialApi::class)
 @Composable
-fun SearchScreen(
+fun SearchAndFilterScreen(
     environment: Environment? = null,
     onBackClicked: () -> Unit,
     scaffoldState: ScaffoldState,
@@ -226,7 +213,7 @@ fun SearchScreen(
                                 sheetState.show()
                             }
                         },
-                        shouldShowPillBar = false
+                        shouldShowPillBar = true
                     )
                 }
             },
@@ -270,12 +257,7 @@ fun SearchScreen(
                         }
 
                         val state = getCardProjectState(project)
-                        val fundingInfoString =
-                            getFundingInfoString(
-                                state,
-                                environment,
-                                project
-                            )
+                        val fundingInfoString = getFundingInfoString(state, environment, project)
 
                         if (index == 0) {
                             Spacer(modifier = Modifier.height(dimensions.paddingMedium))

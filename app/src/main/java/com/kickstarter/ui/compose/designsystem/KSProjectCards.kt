@@ -31,10 +31,17 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.kickstarter.R
 import com.kickstarter.models.Photo
-import com.kickstarter.ui.activities.compose.search.CardProjectState
 import com.kickstarter.ui.compose.designsystem.KSTheme.colors
 import com.kickstarter.ui.compose.designsystem.KSTheme.dimensions
 import com.kickstarter.ui.compose.designsystem.KSTheme.typographyV2
+
+enum class CardProjectState {
+    LIVE,
+    LATE_PLEDGES_ACTIVE,
+    LAUNCHING_SOON,
+    ENDED_SUCCESSFUL,
+    ENDED_UNSUCCESSFUL
+}
 
 @Composable
 @Preview(name = "Light", uiMode = Configuration.UI_MODE_NIGHT_NO)
