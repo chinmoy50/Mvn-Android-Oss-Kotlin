@@ -44,6 +44,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.paging.PagingData
+import androidx.paging.compose.LazyPagingItems
+import androidx.paging.compose.collectAsLazyPagingItems
 import com.kickstarter.R
 import com.kickstarter.libs.Environment
 import com.kickstarter.libs.utils.NumberUtils
@@ -69,6 +72,7 @@ import com.kickstarter.ui.compose.designsystem.KSTheme.typographyV2
 import com.kickstarter.ui.views.compose.search.FilterRowPillType
 import com.kickstarter.ui.views.compose.search.SearchEmptyView
 import com.kickstarter.ui.views.compose.search.SearchTopBar
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 
 @Composable
@@ -76,21 +80,22 @@ import kotlinx.coroutines.launch
 @Preview(name = "Dark", uiMode = Configuration.UI_MODE_NIGHT_YES)
 fun SearchScreenPreviewNonEmpty() {
     KSTheme {
+        val list = List(100) {
+            Project.builder()
+                .name("This is a test $it")
+                .pledged((it * 2).toDouble())
+                .photo(Photo.builder().altText("").full("").build())
+                .goal(100.0)
+                .state(if (it in 10..20) Project.STATE_SUBMITTED else Project.STATE_LIVE)
+                .build()
+        }
         SearchAndFilterScreen(
             onBackClicked = { },
             scaffoldState = rememberScaffoldState(),
             errorSnackBarHostState = SnackbarHostState(),
             isLoading = false,
             isPopularList = true,
-            itemsList = List(100) {
-                Project.builder()
-                    .name("This is a test $it")
-                    .pledged((it * 2).toDouble())
-                    .photo(Photo.builder().altText("").full("").build())
-                    .goal(100.0)
-                    .state(if (it in 10..20) Project.STATE_SUBMITTED else Project.STATE_LIVE)
-                    .build()
-            },
+            itemsList = flowOf(PagingData.from(list)).collectAsLazyPagingItems(),
             lazyColumnListState = rememberLazyListState(),
             showEmptyView = false,
             onSearchTermChanged = {},
@@ -109,7 +114,7 @@ fun SearchScreenPreviewEmpty() {
             scaffoldState = rememberScaffoldState(),
             errorSnackBarHostState = SnackbarHostState(),
             isLoading = true,
-            itemsList = listOf(),
+            itemsList = flowOf(PagingData.from(emptyList<Project>())).collectAsLazyPagingItems(),
             lazyColumnListState = rememberLazyListState(),
             showEmptyView = true,
             onSearchTermChanged = {},
@@ -139,7 +144,7 @@ fun SearchAndFilterScreen(
     errorSnackBarHostState: SnackbarHostState = SnackbarHostState(),
     isPopularList: Boolean = true,
     isLoading: Boolean,
-    itemsList: List<Project> = listOf(),
+    itemsList: LazyPagingItems<Project> = flowOf(PagingData.from(emptyList<Project>())).collectAsLazyPagingItems(),
     lazyColumnListState: LazyListState,
     showEmptyView: Boolean,
     onSearchTermChanged: (String) -> Unit,
@@ -241,7 +246,10 @@ fun SearchAndFilterScreen(
                     state = lazyColumnListState,
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    itemsIndexed(itemsList) { index, project ->
+                    items(
+                        count = itemsList.itemCount,
+                    ) { index ->
+                        val project = itemsList[index] ?: Project.builder().build()
                         if (index == 0 && isPopularList) {
                             Spacer(modifier = Modifier.height(dimensions.paddingMedium))
 
@@ -273,7 +281,7 @@ fun SearchAndFilterScreen(
                                 onItemClicked(project)
                             }
 
-                            if (itemsList.size > 1) {
+                            if (itemsList.itemCount > 1) {
                                 Spacer(modifier = Modifier.height(dimensions.paddingMedium))
                             }
                         } else {
@@ -289,7 +297,7 @@ fun SearchAndFilterScreen(
                                 onItemClicked(project)
                             }
 
-                            if (index < itemsList.size - 1) {
+                            if (index < itemsList.itemCount - 1) {
                                 Spacer(modifier = Modifier.height(dimensions.paddingMedium))
                             } else {
                                 Spacer(modifier = Modifier.height(dimensions.paddingMediumLarge))
@@ -298,7 +306,7 @@ fun SearchAndFilterScreen(
                     }
 
                     item(isLoading) {
-                        if (isLoading && itemsList.isNotEmpty()) {
+                        if (isLoading && itemsList.itemCount == 0) {
                             Spacer(modifier = Modifier.height(dimensions.paddingMedium))
 
                             KSCircularProgressIndicator(
@@ -313,7 +321,7 @@ fun SearchAndFilterScreen(
                 }
             }
 
-            if (isLoading && itemsList.isEmpty()) {
+            if (isLoading && itemsList.itemCount == 0) {
                 Box(
                     modifier = Modifier
                         .testTag(SearchScreenTestTag.LOADING_VIEW.name)

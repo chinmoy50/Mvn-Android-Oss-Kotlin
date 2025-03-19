@@ -19,6 +19,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.paging.compose.collectAsLazyPagingItems
 import com.kickstarter.R
 import com.kickstarter.features.search.ui.compose.SearchAndFilterScreen
 import com.kickstarter.features.search.viewmodel.FilterMenuViewModel
@@ -58,6 +59,7 @@ class SearchAndFilterActivity : ComponentActivity() {
             viewModelFactory = SearchAndFilterViewModel.Factory(env)
             filterMenuViewModelFactory = FilterMenuViewModel.Factory(env)
             filterMenuViewModel.getRootCategories()
+            viewModel.initializePaginDataFlow()
 
             setContent {
                 var currentSearchTerm by rememberSaveable { mutableStateOf("") }
@@ -74,6 +76,8 @@ class SearchAndFilterActivity : ComponentActivity() {
                 // TODO: send the list of categories to the BottomSheet coordinate with MBL-2171
                 val categories = categoriesState.categoriesList
 
+                val projectList = viewModel.projectUpdatesState.collectAsLazyPagingItems()
+
                 SetUpErrorActions(snackbarHostState)
 
                 val darModeEnabled = this.isDarkModeEnabled(env = env)
@@ -83,18 +87,14 @@ class SearchAndFilterActivity : ComponentActivity() {
                         onBackClicked = { onBackPressedDispatcher.onBackPressed() },
                         scaffoldState = rememberScaffoldState(),
                         errorSnackBarHostState = snackbarHostState,
-                        isLoading = isLoading,
+                        isLoading = !projectList.loadState.isIdle,
                         isPopularList = currentSearchTerm.isTrimmedEmpty(),
-                        itemsList = if (currentSearchTerm.isTrimmedEmpty()) {
-                            popularProjects
-                        } else {
-                            searchedProjects
-                        },
+                        itemsList = projectList,
                         lazyColumnListState = lazyListState,
                         showEmptyView = !isLoading &&
                             !isTyping &&
                             !currentSearchTerm.isTrimmedEmpty() &&
-                            (searchedProjects.isEmpty() || popularProjects.isEmpty()),
+                            projectList.itemCount == 0,
                         onSearchTermChanged = { searchTerm ->
                             isTyping = true
                             currentSearchTerm = searchTerm

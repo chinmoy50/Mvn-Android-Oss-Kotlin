@@ -4,21 +4,29 @@ import android.util.Pair
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import androidx.paging.Pager
+import androidx.paging.PagingConfig
+import androidx.paging.PagingData
+import androidx.paging.PagingSource
+import androidx.paging.PagingState
+import androidx.paging.cachedIn
+import com.kickstarter.features.search.data.SearchEnvelope
 import com.kickstarter.libs.Environment
 import com.kickstarter.libs.RefTag
 import com.kickstarter.libs.utils.extensions.isNull
 import com.kickstarter.libs.utils.extensions.isTrue
 import com.kickstarter.models.Category
 import com.kickstarter.models.Project
+import com.kickstarter.services.ApolloClientTypeV2
 import com.kickstarter.services.DiscoveryParams
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -32,6 +40,46 @@ data class SearchUIState(
     val popularProjectsList: List<Project> = emptyList(),
     val searchList: List<Project> = emptyList()
 )
+
+class SearchAndFilterPagingSource(
+    private val apolloClient: ApolloClientTypeV2,
+    private val viewModel: SearchAndFilterViewModel,
+    private val limit: Int = 25,
+) : PagingSource<String, Project>() {
+
+    var pageCount = 0
+    override fun getRefreshKey(state: PagingState<String, Project>): String {
+        return "" // - Default first page is empty string when paginating with graphQL
+    }
+
+    override suspend fun load(params: LoadParams<String>): LoadResult<String, Project> {
+        return try {
+            pageCount++
+            val currentCursor = params.key ?: ""
+            // - Result from API
+            Timber.d("${this.javaClass} params: ${viewModel.params.value}")
+            val result = apolloClient.getSearchProjects(viewModel.params.value, currentCursor)
+            return if (result.isSuccess) {
+                result.getOrNull()?.let { env ->
+                    val nextPageEnvelope = if (env.pageInfo?.hasNextPage == true) env.pageInfo else null
+//                    Timber.d("${this.javaClass} **** Page: ${nextPageEnvelope?.startCursor}")
+//                    Timber.d("${this.javaClass} **** Page: ${nextPageEnvelope?.hasPreviousPage}")
+//                    Timber.d("${this.javaClass} **** Page: ${nextPageEnvelope?.hasNextPage}")
+//                    Timber.d("${this.javaClass} **** Page: ${nextPageEnvelope?.endCursor}")
+
+                    Timber.d("${this.javaClass} **** listOfResults : ${env.projectList.size}")
+                    return LoadResult.Page(
+                        data = env.projectList,
+                        prevKey = null,
+                        nextKey = nextPageEnvelope?.startCursor
+                    )
+                } ?: LoadResult.Error(Throwable())
+            } else LoadResult.Error(result.exceptionOrNull() ?: Throwable())
+        } catch (e: Exception) {
+            LoadResult.Error(e)
+        }
+    }
+}
 
 @OptIn(FlowPreview::class)
 class SearchAndFilterViewModel(
@@ -53,6 +101,9 @@ class SearchAndFilterViewModel(
                 initialValue = SearchUIState()
             )
 
+    private val _uiState = MutableStateFlow<PagingData<Project>>(PagingData.empty())
+    val projectUpdatesState: StateFlow<PagingData<Project>> = _uiState.asStateFlow()
+
     // - Popular projects sorting selection
     private val firstLoadParams = DiscoveryParams.builder().sort(DiscoveryParams.Sort.POPULAR).build()
 
@@ -68,25 +119,64 @@ class SearchAndFilterViewModel(
     private var projectsList = emptyList<Project>()
     private var popularProjectsList = emptyList<Project>()
 
+    var shouldInvalidate = false
     init {
         scope.launch {
-            val debounced = _searchTerm
+            _searchTerm
                 .debounce(debouncePeriod)
-
-            _params
-                .combine(debounced) { currentParams, debouncedTerm ->
+                .collectLatest { debouncedTerm ->
                     // - Reset to initial state in case of empty search term
                     if (debouncedTerm.isEmpty() || debouncedTerm.isBlank()) {
-                        currentParams
+                        _params.emit(params.value)
+                        shouldInvalidate = true
                     } else {
-                        currentParams.toBuilder()
+                        val newParams = params.value.toBuilder()
                             .term(debouncedTerm)
                             .build()
+                        _params.emit(newParams)
+                        shouldInvalidate = true
                     }
+
+                    analyticEvents.trackSearchCTAButtonClicked(params.value)
+
+                    loadProjects()
                 }
-                .collectLatest { params ->
-                    updateSearchResultsState(params)
+        }
+    }
+
+    private lateinit var pagingDataFlow: Flow<PagingData<Project>>
+    var pagingSource = SearchAndFilterPagingSource(apolloClient, this@SearchAndFilterViewModel)
+
+    fun initializePaginDataFlow() {
+        scope.launch {
+            val limit = 25
+            pagingDataFlow = Pager(
+                PagingConfig(
+                    pageSize = limit,
+                    prefetchDistance = 3,
+                    enablePlaceholders = true,
+                )
+            ) {
+                pagingSource
+            }
+                .flow
+                .cachedIn(scope)
+        }
+    }
+
+    fun loadProjects() {
+        scope.launch {
+            if (shouldInvalidate) {
+                pagingSource.invalidate()
+                pagingSource = SearchAndFilterPagingSource(apolloClient, this@SearchAndFilterViewModel)
+            }
+            try {
+                pagingDataFlow.collectLatest { pagingData ->
+                    _uiState.value = pagingData
                 }
+            } catch (e: Exception) {
+                // emit error
+            }
         }
     }
 
@@ -104,20 +194,21 @@ class SearchAndFilterViewModel(
 
         scope.launch {
             _params.emit(update)
+            shouldInvalidate = true
+            loadProjects()
         }
     }
 
     /**
      * Update UIState with after executing Search query with latest params
      */
-    private suspend fun updateSearchResultsState(params: DiscoveryParams) {
-        analyticEvents.trackSearchCTAButtonClicked(params)
+    suspend fun updateSearchResultsState(params: DiscoveryParams, cursor: String? = null): Result<SearchEnvelope> {
 
         emitCurrentState(isLoading = true)
 
         // - Result from API
         Timber.d("${this.javaClass} params: $params")
-        val searchEnvelopeResult = apolloClient.getSearchProjects(params)
+        val searchEnvelopeResult = apolloClient.getSearchProjects(params, cursor)
 
         if (searchEnvelopeResult.isFailure) {
             // - errorAction.invoke(searchEnvelopeResult.exceptionOrNull()?.message) to return API level message
@@ -138,6 +229,8 @@ class SearchAndFilterViewModel(
                 )
             }
         }
+
+        return searchEnvelopeResult
     }
 
     private suspend fun emitCurrentState(isLoading: Boolean = false) {
