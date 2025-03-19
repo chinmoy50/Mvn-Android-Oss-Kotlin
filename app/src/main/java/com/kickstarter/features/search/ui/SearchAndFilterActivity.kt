@@ -76,7 +76,7 @@ class SearchAndFilterActivity : ComponentActivity() {
                 // TODO: send the list of categories to the BottomSheet coordinate with MBL-2171
                 val categories = categoriesState.categoriesList
 
-                val projectList = viewModel.projectUpdatesState.collectAsLazyPagingItems()
+                val projectList = viewModel.pagingDataFlow.collectAsLazyPagingItems()
 
                 SetUpErrorActions(snackbarHostState)
 

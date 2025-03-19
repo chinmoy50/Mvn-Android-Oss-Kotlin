@@ -28,6 +28,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.plus
@@ -43,7 +44,7 @@ data class SearchUIState(
 
 class SearchAndFilterPagingSource(
     private val apolloClient: ApolloClientTypeV2,
-    private val viewModel: SearchAndFilterViewModel,
+    private val discoveryParams: DiscoveryParams,
     private val limit: Int = 25,
 ) : PagingSource<String, Project>() {
 
@@ -57,8 +58,8 @@ class SearchAndFilterPagingSource(
             pageCount++
             val currentCursor = params.key ?: ""
             // - Result from API
-            Timber.d("${this.javaClass} params: ${viewModel.params.value}")
-            val result = apolloClient.getSearchProjects(viewModel.params.value, currentCursor)
+            Timber.d("${this.javaClass} params: $params")
+            val result = apolloClient.getSearchProjects(discoveryParams, currentCursor)
             return if (result.isSuccess) {
                 result.getOrNull()?.let { env ->
                     val nextPageEnvelope = if (env.pageInfo?.hasNextPage == true) env.pageInfo else null
@@ -101,9 +102,6 @@ class SearchAndFilterViewModel(
                 initialValue = SearchUIState()
             )
 
-    private val _uiState = MutableStateFlow<PagingData<Project>>(PagingData.empty())
-    val projectUpdatesState: StateFlow<PagingData<Project>> = _uiState.asStateFlow()
-
     // - Popular projects sorting selection
     private val firstLoadParams = DiscoveryParams.builder().sort(DiscoveryParams.Sort.POPULAR).build()
 
@@ -119,7 +117,6 @@ class SearchAndFilterViewModel(
     private var projectsList = emptyList<Project>()
     private var popularProjectsList = emptyList<Project>()
 
-    var shouldInvalidate = false
     init {
         scope.launch {
             _searchTerm
@@ -128,55 +125,36 @@ class SearchAndFilterViewModel(
                     // - Reset to initial state in case of empty search term
                     if (debouncedTerm.isEmpty() || debouncedTerm.isBlank()) {
                         _params.emit(params.value)
-                        shouldInvalidate = true
                     } else {
                         val newParams = params.value.toBuilder()
                             .term(debouncedTerm)
                             .build()
                         _params.emit(newParams)
-                        shouldInvalidate = true
                     }
 
                     analyticEvents.trackSearchCTAButtonClicked(params.value)
-
-                    loadProjects()
                 }
         }
     }
 
-    private lateinit var pagingDataFlow: Flow<PagingData<Project>>
-    var pagingSource = SearchAndFilterPagingSource(apolloClient, this@SearchAndFilterViewModel)
+    lateinit var pagingDataFlow: Flow<PagingData<Project>>
 
     fun initializePaginDataFlow() {
         scope.launch {
             val limit = 25
-            pagingDataFlow = Pager(
-                PagingConfig(
-                    pageSize = limit,
-                    prefetchDistance = 3,
-                    enablePlaceholders = true,
-                )
-            ) {
-                pagingSource
-            }
-                .flow
-                .cachedIn(scope)
-        }
-    }
-
-    fun loadProjects() {
-        scope.launch {
-            if (shouldInvalidate) {
-                pagingSource.invalidate()
-                pagingSource = SearchAndFilterPagingSource(apolloClient, this@SearchAndFilterViewModel)
-            }
-            try {
-                pagingDataFlow.collectLatest { pagingData ->
-                    _uiState.value = pagingData
-                }
-            } catch (e: Exception) {
-                // emit error
-            }
+            pagingDataFlow =
+                params
+                    .flatMapLatest { params ->
+                        Pager(
+                            PagingConfig(
+                                pageSize = limit,
+                                prefetchDistance = 3,
+                                enablePlaceholders = true,
+                            ),
+                            pagingSourceFactory = { SearchAndFilterPagingSource(apolloClient, params) }
+                        )
+                            .flow
+                    }.cachedIn(scope)
         }
     }
 
@@ -194,8 +172,6 @@ class SearchAndFilterViewModel(
 
         scope.launch {
             _params.emit(update)
-            shouldInvalidate = true
-            loadProjects()
         }
     }
 
