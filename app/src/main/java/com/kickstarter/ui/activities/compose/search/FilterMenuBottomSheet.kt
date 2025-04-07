@@ -64,6 +64,7 @@ enum class FilterType {
 fun FilterMenuBottomSheet(
     selectedProjectStatus: DiscoveryParams.State? = null,
     availableFilters: List<FilterType> = FilterType.values().asList(),
+    onNavigate: () -> Unit = {},
     onDismiss: () -> Unit = {},
     onApply: (DiscoveryParams.State?) -> Unit = {}
 ) {
@@ -90,7 +91,7 @@ fun FilterMenuBottomSheet(
                     when (filter) {
                         FilterType.CATEGORIES -> FilterRow(
                             text = titleForFilter(filter),
-                            callback = onDismiss,
+                            callback = onNavigate,
                             icon = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                             modifier = Modifier.testTag(FilterMenuTestTags.CATEGORY_ROW)
                         )

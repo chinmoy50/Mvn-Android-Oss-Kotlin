@@ -269,6 +269,9 @@ fun SearchScreen(
 
                     FilterMenuBottomSheet(
                         selectedProjectStatus = currentProjectState.value,
+                        onNavigate = {
+                            navController.navigate("category")
+                        },
                         onDismiss = {
                             coroutineScope.launch { bottomSheetState.hide() }
                             onDismissBottomSheet(currentCategory.value, currentSort.value, currentProjectState.value)
