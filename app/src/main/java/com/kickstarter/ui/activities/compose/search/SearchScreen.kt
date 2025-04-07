@@ -47,6 +47,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
 import com.kickstarter.R
 import com.kickstarter.libs.Environment
 import com.kickstarter.libs.utils.NumberUtils
@@ -180,12 +183,17 @@ fun SearchScreen(
     shouldShowPillbar: Boolean = true
 ) {
     var currentSearchTerm by rememberSaveable { mutableStateOf("") }
-
     val coroutineScope = rememberCoroutineScope()
 
     val countApiIsReady = false // Hide all result counts until backend API is ready
 
-    val selectedFilterCounts: SnapshotStateMap<String, Int> = remember {
+    val navController = rememberNavController()
+    val bottomSheetState = rememberModalBottomSheetState(
+        initialValue = Hidden,
+        skipHalfExpanded = false
+    )
+
+    val selectedFilterCounts = remember {
         mutableStateMapOf(
             FilterRowPillType.SORT.name to 0,
             FilterRowPillType.CATEGORY.name to 0,
@@ -193,68 +201,111 @@ fun SearchScreen(
             FilterRowPillType.PROJECT_STATUS.name to 0,
         )
     }
+
     val initialCategoryPillText = stringResource(R.string.Category)
     val categoryPillText = remember { mutableStateOf(initialCategoryPillText) }
 
-    val initialProjectStatsPillText = stringResource(R.string.Project_Status_fpo)
-    val projectStatusPill = remember { mutableStateOf(initialProjectStatsPillText) }
+    val initialProjectStatusText = stringResource(R.string.Project_Status_fpo)
+    val projectStatusPill = remember { mutableStateOf(initialProjectStatusText) }
 
     val currentSort = remember { mutableStateOf(DiscoveryParams.Sort.MAGIC) }
     val currentCategory = remember { mutableStateOf<Category?>(null) }
     val currentProjectState = remember { mutableStateOf<DiscoveryParams.State?>(null) }
 
-    val activeBottomSheet = remember {
-        mutableStateOf<FilterRowPillType?>(null)
-    }
-
-    val categorySheetState = rememberModalBottomSheetState(
-        initialValue = Hidden,
-        skipHalfExpanded = true
-    )
-
-    val sortSheetState = rememberModalBottomSheetState(
-        initialValue = Hidden,
-        skipHalfExpanded = false
-    )
-
-    val mainFilterMenuState = rememberModalBottomSheetState(
-        initialValue = Hidden,
-        skipHalfExpanded = true
-    )
-
     ModalBottomSheetLayout(
-        sheetState = modalBottomSheetState(
-            activeBottomSheet,
-            categorySheetState,
-            sortSheetState,
-            mainFilterMenuState
-        ),
-        sheetContent = sheetContent(
-            activeBottomSheet,
-            coroutineScope,
-            categorySheetState,
-            currentCategory,
-            onDismissBottomSheet,
-            currentSort,
-            currentProjectState,
-            categories,
-            categoryPillText,
-            projectStatusPill,
-            initialCategoryPillText,
-            selectedFilterCounts,
-            countApiIsReady,
-            sortSheetState,
-            mainFilterMenuState
-        ),
+        sheetState = bottomSheetState,
+        sheetContent = {
+            NavHost(
+                navController = navController,
+                startDestination = "sort"
+            ) {
+                composable("sort") {
+                    SortSelectionBottomSheet(
+                        currentSelection = currentSort.value,
+                        sorts = ProjectSort.knownValues().toDiscoveryParamsList(),
+                        onDismiss = { sort ->
+                            currentSort.value = sort
+                            coroutineScope.launch {
+                                bottomSheetState.hide()
+                            }
+                            onDismissBottomSheet(currentCategory.value, sort, currentProjectState.value)
+                            selectedFilterCounts[FilterRowPillType.SORT.name] =
+                                if (sort == DiscoveryParams.Sort.MAGIC) 0 else 1
+                        }
+                    )
+                }
+                composable("category") {
+                    CategorySelectionSheet(
+                        currentCategory = currentCategory.value,
+                        categories = categories,
+                        isLoading = false,
+                        onDismiss = {
+                            coroutineScope.launch {
+                                bottomSheetState.hide()
+                            }
+                            onDismissBottomSheet(currentCategory.value, currentSort.value, currentProjectState.value)
+                        },
+                        onApply = { selectedCategory ->
+                            categoryPillText.value = selectedCategory.name()
+                            coroutineScope.launch { bottomSheetState.hide() }
+
+                            if (selectedCategory.name() == initialCategoryPillText) {
+                                onDismissBottomSheet(null, currentSort.value, currentProjectState.value)
+                                selectedFilterCounts[FilterRowPillType.CATEGORY.name] = 0
+                                currentCategory.value = null
+                            } else {
+                                onDismissBottomSheet(selectedCategory, currentSort.value, currentProjectState.value)
+                                currentCategory.value = selectedCategory
+                                selectedFilterCounts[FilterRowPillType.CATEGORY.name] = 1
+                            }
+                        }
+                    )
+                }
+                composable("filter") {
+                    val liveString = stringResource(R.string.Project_Status_Live_fpo)
+                    val successfulString = stringResource(R.string.Project_Status_Successful_fpo)
+                    val upcomingString = stringResource(R.string.Project_Status_Upcoming_fpo)
+                    val latePledgeString = stringResource(R.string.Project_Status_Late_Pledges_fpo)
+
+                    FilterMenuBottomSheet(
+                        selectedProjectStatus = currentProjectState.value,
+                        onDismiss = {
+                            coroutineScope.launch { bottomSheetState.hide() }
+                            onDismissBottomSheet(currentCategory.value, currentSort.value, currentProjectState.value)
+                        },
+                        onApply = { projectState ->
+                            val statusText = when (projectState) {
+                                DiscoveryParams.State.LIVE -> liveString
+                                DiscoveryParams.State.SUCCESSFUL -> successfulString
+                                DiscoveryParams.State.UPCOMING -> upcomingString
+                                DiscoveryParams.State.LATE_PLEDGES -> latePledgeString
+                                else -> initialProjectStatusText
+                            }
+
+                            projectStatusPill.value = statusText
+                            currentProjectState.value = projectState
+
+                            coroutineScope.launch { bottomSheetState.hide() }
+
+                            val count = if (projectState != null) 1 else 0
+                            selectedFilterCounts[FilterRowPillType.FILTER.name] = count
+                            selectedFilterCounts[FilterRowPillType.PROJECT_STATUS.name] = count
+
+                            onDismissBottomSheet(currentCategory.value, currentSort.value, projectState)
+                        }
+                    )
+                }
+            }
+        },
         sheetShape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
-        sheetBackgroundColor = colors.kds_white
+        sheetBackgroundColor = KSTheme.colors.kds_white
     ) {
         Scaffold(
             modifier = Modifier.systemBarsPadding(),
             scaffoldState = scaffoldState,
             snackbarHost = {
                 SnackbarHost(
-                    modifier = Modifier.padding(dimensions.paddingSmall),
+                    modifier = Modifier.padding(KSTheme.dimensions.paddingSmall),
                     hostState = errorSnackBarHostState,
                     snackbar = { data ->
                         if (data.actionLabel == KSSnackbarTypes.KS_ERROR.name) {
@@ -268,121 +319,124 @@ fun SearchScreen(
             topBar = {
                 Surface(elevation = 3.dp) {
                     SearchTopBar(
-                        countApiIsReady = countApiIsReady,
+                        countApiIsReady = false,
                         categoryPillText = categoryPillText.value,
                         onBackPressed = onBackClicked,
                         projectStatusText = projectStatusPill.value,
                         onValueChanged = {
-                            onSearchTermChanged.invoke(it)
+                            onSearchTermChanged(it)
                             currentSearchTerm = it
                         },
                         selectedFilterCounts = selectedFilterCounts,
-                        onPillPressed = onPillPressed(
-                            activeBottomSheet,
-                            coroutineScope,
-                            sortSheetState,
-                            categorySheetState,
-                            mainFilterMenuState
-                        ),
+                        onPillPressed = { filterType ->
+                            coroutineScope.launch {
+                                when (filterType) {
+                                    FilterRowPillType.SORT -> navController.navigate("sort")
+                                    FilterRowPillType.CATEGORY -> navController.navigate("category")
+                                    FilterRowPillType.FILTER, FilterRowPillType.PROJECT_STATUS -> navController.navigate("filter")
+                                }
+                                bottomSheetState.show()
+                            }
+                        },
                         shouldShowPillbar = shouldShowPillbar
                     )
                 }
             },
-            backgroundColor = colors.kds_white
+            backgroundColor = KSTheme.colors.kds_white
         ) { padding ->
             if (showEmptyView) {
-                SearchEmptyView(
-                    modifier = Modifier
-                        .testTag(SearchScreenTestTag.EMPTY_VIEW.name)
-                        .background(colors.backgroundSurfaceSecondary),
-                    environment = environment,
-                    currentSearchTerm = currentSearchTerm
-                )
-            } else {
-                LazyColumn(
-                    modifier = Modifier
-                        .testTag(SearchScreenTestTag.LIST_VIEW.name)
-                        .padding(padding)
-                        .background(colors.backgroundSurfaceSecondary)
-                        .fillMaxWidth(),
-                    contentPadding = PaddingValues(
-                        start = dimensions.paddingMediumLarge,
-                        end = dimensions.paddingMediumLarge
-                    ),
-                    state = lazyColumnListState,
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    itemsIndexed(itemsList) { index, project ->
-                        if (index == 0 && isDefaultList) {
-                            Spacer(modifier = Modifier.height(dimensions.paddingMedium))
+            SearchEmptyView(
+                modifier = Modifier
+                    .testTag(SearchScreenTestTag.EMPTY_VIEW.name)
+                    .background(colors.backgroundSurfaceSecondary),
+                environment = environment,
+                currentSearchTerm = currentSearchTerm
+            )
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .testTag(SearchScreenTestTag.LIST_VIEW.name)
+                    .padding(padding)
+                    .background(colors.backgroundSurfaceSecondary)
+                    .fillMaxWidth(),
+                contentPadding = PaddingValues(
+                    start = dimensions.paddingMediumLarge,
+                    end = dimensions.paddingMediumLarge
+                ),
+                state = lazyColumnListState,
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                itemsIndexed(itemsList) { index, project ->
+                    if (index == 0 && isDefaultList) {
+                        Spacer(modifier = Modifier.height(dimensions.paddingMedium))
 
-                            Text(
-                                modifier = Modifier
-                                    .testTag(SearchScreenTestTag.DISCOVER_PROJECTS_TITLE.name)
-                                    .fillMaxWidth(),
-                                text = stringResource(id = R.string.activity_empty_state_logged_in_button),
-                                style = typographyV2.title2,
-                                color = colors.kds_support_700,
-                                textAlign = TextAlign.Start
-                            )
-                        }
-
-                        val state = getCardProjectState(project)
-                        val fundingInfoString = getFundingInfoString(state, environment, project)
-
-                        if (index == 0) {
-                            Spacer(modifier = Modifier.height(dimensions.paddingMedium))
-                            KSProjectCardLarge(
-                                modifier = Modifier
-                                    .testTag(SearchScreenTestTag.FEATURED_PROJECT_VIEW.name),
-                                photo = project.photo(),
-                                title = project.name(),
-                                state = state,
-                                fundingInfoString = fundingInfoString,
-                                fundedPercentage = project.percentageFunded().toInt(),
-                            ) {
-                                onItemClicked(project)
-                            }
-
-                            if (itemsList.size > 1) {
-                                Spacer(modifier = Modifier.height(dimensions.paddingMedium))
-                            }
-                        } else {
-                            KSProjectCardSmall(
-                                modifier = Modifier
-                                    .testTag(SearchScreenTestTag.NORMAL_PROJECT_VIEW.name + index),
-                                photo = project.photo(),
-                                title = project.name(),
-                                state = state,
-                                fundingInfoString = fundingInfoString,
-                                fundedPercentage = project.percentageFunded().toInt(),
-                            ) {
-                                onItemClicked(project)
-                            }
-
-                            if (index < itemsList.size - 1) {
-                                Spacer(modifier = Modifier.height(dimensions.paddingMedium))
-                            } else {
-                                Spacer(modifier = Modifier.height(dimensions.paddingMediumLarge))
-                            }
-                        }
+                        Text(
+                            modifier = Modifier
+                                .testTag(SearchScreenTestTag.DISCOVER_PROJECTS_TITLE.name)
+                                .fillMaxWidth(),
+                            text = stringResource(id = R.string.activity_empty_state_logged_in_button),
+                            style = typographyV2.title2,
+                            color = colors.kds_support_700,
+                            textAlign = TextAlign.Start
+                        )
                     }
 
-                    item(isLoading) {
-                        if (isLoading && itemsList.isNotEmpty()) {
-                            Spacer(modifier = Modifier.height(dimensions.paddingMedium))
+                    val state = getCardProjectState(project)
+                    val fundingInfoString = getFundingInfoString(state, environment, project)
 
-                            KSCircularProgressIndicator(
-                                modifier = Modifier
-                                    .testTag(SearchScreenTestTag.IN_LIST_LOADING_VIEW.name)
-                                    .size(size = dimensions.imageSizeLarge)
-                            )
+                    if (index == 0) {
+                        Spacer(modifier = Modifier.height(dimensions.paddingMedium))
+                        KSProjectCardLarge(
+                            modifier = Modifier
+                                .testTag(SearchScreenTestTag.FEATURED_PROJECT_VIEW.name),
+                            photo = project.photo(),
+                            title = project.name(),
+                            state = state,
+                            fundingInfoString = fundingInfoString,
+                            fundedPercentage = project.percentageFunded().toInt(),
+                        ) {
+                            onItemClicked(project)
+                        }
 
+                        if (itemsList.size > 1) {
                             Spacer(modifier = Modifier.height(dimensions.paddingMedium))
+                        }
+                    } else {
+                        KSProjectCardSmall(
+                            modifier = Modifier
+                                .testTag(SearchScreenTestTag.NORMAL_PROJECT_VIEW.name + index),
+                            photo = project.photo(),
+                            title = project.name(),
+                            state = state,
+                            fundingInfoString = fundingInfoString,
+                            fundedPercentage = project.percentageFunded().toInt(),
+                        ) {
+                            onItemClicked(project)
+                        }
+
+                        if (index < itemsList.size - 1) {
+                            Spacer(modifier = Modifier.height(dimensions.paddingMedium))
+                        } else {
+                            Spacer(modifier = Modifier.height(dimensions.paddingMediumLarge))
                         }
                     }
                 }
+
+                item(isLoading) {
+                    if (isLoading && itemsList.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(dimensions.paddingMedium))
+
+                        KSCircularProgressIndicator(
+                            modifier = Modifier
+                                .testTag(SearchScreenTestTag.IN_LIST_LOADING_VIEW.name)
+                                .size(size = dimensions.imageSizeLarge)
+                        )
+
+                        Spacer(modifier = Modifier.height(dimensions.paddingMedium))
+                    }
+                }
             }
+        }
 
             if (isLoading && itemsList.isEmpty()) {
                 Box(
