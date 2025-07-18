@@ -33,14 +33,7 @@ jobs:
           echo "$VULNS_TABLE"
         else
           echo "No SCA vulnerabilities found."
-        fi   
-    
-    
-    - name: Rebuild with Maven
-      run: mvn clean package
-    
-    - name: Upload artifact
-      uses: actions/upload-artifact@v3
+        fi
       with:
         name: sca-project-files
         path: target/*.jar
